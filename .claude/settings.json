@@ -1,0 +1,55 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run test*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run build*)",
+      "Bash(npm run dev*)",
+      "Bash(./init.sh)",
+      "Bash(npx prisma migrate dev)",
+      "Bash(npx prisma generate)",
+      "Bash(npx prisma studio)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(node *)",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ],
+    "deny": [
+      "Bash(git push*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|Create",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[hook] Archivo modificado: verificar que no hay console.log de debug ni any explícito en el diff'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const f=require('./feature_list.json'); const inProgress=f.features.filter(x=>x.status==='in_progress'); if(inProgress.length>1){console.error('ERROR: Más de una feature in_progress: '+inProgress.map(x=>x.name).join(', ')); process.exit(1);}\" 2>&1 || true"
+          },
+          {
+            "type": "command",
+            "command": "git diff --quiet HEAD 2>/dev/null && echo '[hook] git: working tree limpio ✅' || echo '[hook] ⚠️  Hay cambios sin commitear. Si acabas de aprobar una feature, ejecuta: git add -A && git commit -m \"feat(<feature>): <título>\"'"
+          }
+        ]
+      }
+    ]
+  }
+}

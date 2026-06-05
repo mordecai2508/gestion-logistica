@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  CLIENTE
+  OPERADOR
+  REPARTIDOR
+}
+
+enum EstadoEnvio {
+  PENDIENTE
+  EN_PREPARACION
+  EN_TRANSITO
+  ENTREGADO
+  CANCELADO
+  FALLIDO
+}
+
+enum EstadoRuta {
+  PENDIENTE
+  EN_CURSO
+  COMPLETADA
+  CANCELADA
+}
+
+enum EstadoVehiculo {
+  DISPONIBLE
+  EN_RUTA
+  MANTENIMIENTO
+  FUERA_SERVICIO
+}
+
+enum TipoIncidencia {
+  ENTREGA_FALLIDA
+  CLIENTE_AUSENTE
+  DANIO
+  DIRECCION_INCORRECTA
+  OTRO
+}
+
+enum EstadoIncidencia {
+  ABIERTA
+  EN_PROCESO
+  RESUELTA
+}
+
+model Usuario {
+  id                  String               @id @default(cuid())
+  nombre              String
+  correo              String               @unique
+  password            String
+  telefono            String?
+  rol                 Rol
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  cliente             Cliente?
+  operador            Operador?
+  repartidor          Repartidor?
+  notificaciones      Notificacion[]
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens       RefreshToken[]
+}
+
+model Cliente {
+  id        String  @id @default(cuid())
+  usuarioId String  @unique
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  envios    Envio[]
+}
+
+model Operador {
+  id        String  @id @default(cuid())
+  usuarioId String  @unique
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+}
+
+model Repartidor {
+  id         String  @id @default(cuid())
+  usuarioId  String  @unique
+  licencia   String?
+  disponible Boolean @default(true)
+  usuario    Usuario @relation(fields: [usuarioId], references: [id])
+  rutas      Ruta[]
+}
+
+model Envio {
+  id                  String      @id @default(cuid())
+  codigoSeguimiento   String      @unique
+  remitente           String
+  destinatario        String
+  direccionDestino    String
+  peso                Float
+  dimensiones         String
+  descripcion         String?
+  estado              EstadoEnvio @default(PENDIENTE)
+  clienteId           String
+  rutaId              String?
+  evidenciaFoto       String?
+  firma               String?
+  fechaReprogramacion DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  cliente             Cliente     @relation(fields: [clienteId], references: [id])
+  ruta                Ruta?       @relation(fields: [rutaId], references: [id])
+  eventos             EventoEnvio[]
+  incidencias         Incidencia[]
+  notificaciones      Notificacion[]
+}
+
+model Ruta {
+  id           String     @id @default(cuid())
+  nombre       String?
+  estado       EstadoRuta @default(PENDIENTE)
+  repartidorId String
+  vehiculoId   String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  repartidor   Repartidor @relation(fields: [repartidorId], references: [id])
+  vehiculo     Vehiculo   @relation(fields: [vehiculoId], references: [id])
+  envios       Envio[]
+}
+
+model Vehiculo {
+  id        String         @id @default(cuid())
+  placa     String         @unique
+  modelo    String
+  capacidad Float
+  estado    EstadoVehiculo @default(DISPONIBLE)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  rutas     Ruta[]
+}
+
+model EventoEnvio {
+  id          String      @id @default(cuid())
+  descripcion String
+  estado      EstadoEnvio
+  lat         Float?
+  lng         Float?
+  timestamp   DateTime    @default(now())
+  envioId     String
+  envio       Envio       @relation(fields: [envioId], references: [id])
+}
+
+model Incidencia {
+  id          String           @id @default(cuid())
+  tipo        TipoIncidencia
+  descripcion String
+  estado      EstadoIncidencia @default(ABIERTA)
+  foto        String?
+  nota        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  envioId     String
+  envio       Envio            @relation(fields: [envioId], references: [id])
+}
+
+model Notificacion {
+  id        String   @id @default(cuid())
+  mensaje   String
+  leida     Boolean  @default(false)
+  usuarioId String
+  envioId   String?
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+  envio     Envio?   @relation(fields: [envioId], references: [id])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String
+  expiresAt DateTime
+  usado     Boolean  @default(false)
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  usuarioId String
+  expiresAt DateTime
+  revocado  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+}

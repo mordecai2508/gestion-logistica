@@ -1,0 +1,236 @@
+{
+  "project": "sistema-logistica-envios",
+  "description": "Plataforma web para gestión integral de envíos, rutas, vehículos, repartidores, incidencias y seguimiento en tiempo real. Monorepo backend (Express+TypeScript+Prisma) y frontend (React+Vite).",
+  "rules": {
+    "one_feature_at_a_time": true,
+    "require_tests_to_close": true,
+    "require_approved_spec_to_implement": true,
+    "valid_status": ["pending", "spec_ready", "in_progress", "done", "blocked"],
+    "sdd_required_when": "feature tiene \"sdd\": true"
+  },
+  "sprints": {
+    "sprint_1": "Autenticación y Acceso",
+    "sprint_2": "Gestión de Envíos",
+    "sprint_3": "Rastreo y Logística",
+    "sprint_4": "Entregas, Incidencias y Notificaciones"
+  },
+  "features": [
+    {
+      "id": 1,
+      "sprint": 1,
+      "name": "auth_login",
+      "title": "Login y autenticación JWT",
+      "description": "Pantalla de login con email/contraseña. El backend valida credenciales, emite accessToken (15 min) + refreshToken (7 días, httpOnly cookie). El frontend redirige según el rol decodificado del token.",
+      "stories": ["HU1", "HU6"],
+      "acceptance": [
+        "POST /api/v1/auth/login devuelve accessToken en body y refreshToken en cookie httpOnly",
+        "POST /api/v1/auth/refresh rota el refreshToken y emite nuevo accessToken",
+        "POST /api/v1/auth/logout limpia la cookie",
+        "El middleware authMiddleware rechaza requests sin token válido con 401",
+        "El frontend redirige a /dashboard (Operador), /repartidor (Repartidor) o /tracking (Cliente) según rol",
+        "Pantalla de login coincide con el wireframe (WIFRAME.pdf)",
+        "Tests: login exitoso, credenciales incorrectas, token expirado, logout"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 2,
+      "sprint": 1,
+      "name": "auth_registro",
+      "title": "Registro de usuarios",
+      "description": "Formulario de registro con nombre, correo, contraseña, confirmación, teléfono y rol. El backend hashea la contraseña y persiste el usuario con el rol correspondiente.",
+      "stories": ["HU2", "HU3"],
+      "acceptance": [
+        "POST /api/v1/auth/register crea usuario y devuelve 201 con { data: { id, correo, rol } }",
+        "La contraseña se hashea con bcrypt (rounds >= 10) antes de persistir",
+        "Correo único validado: si ya existe devuelve 409",
+        "Validación Zod en backend: todos los campos requeridos, formato de correo, contraseña >= 8 chars",
+        "Validación en frontend con React Hook Form + Zod schema",
+        "Pantalla de registro coincide con el wireframe (WIFRAME.pdf)",
+        "Tests: registro exitoso, correo duplicado, campos inválidos"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 3,
+      "sprint": 1,
+      "name": "auth_perfil",
+      "title": "Perfil de usuario y recuperación de contraseña",
+      "description": "Vista de perfil (todos los roles) que permite actualizar nombre y teléfono. Flujo de recuperación de contraseña por correo con token de un solo uso.",
+      "stories": ["HU4", "HU5"],
+      "acceptance": [
+        "GET /api/v1/users/me devuelve datos del usuario autenticado",
+        "PATCH /api/v1/users/me actualiza nombre y/o teléfono",
+        "POST /api/v1/auth/forgot-password envía correo con enlace de reset (token de 1 h)",
+        "POST /api/v1/auth/reset-password valida token y actualiza contraseña",
+        "Token de reset invalidado tras primer uso",
+        "Tests: obtener perfil, actualizar perfil, solicitar reset, reset exitoso, token expirado"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 4,
+      "sprint": 2,
+      "name": "envios_crear",
+      "title": "Crear envío",
+      "description": "El operador registra un nuevo envío con remitente, destinatario, dirección destino, peso, dimensiones y descripción. El sistema genera un código de seguimiento único (TRK-YYYYMMDD-XXXXXXXX) y notifica al cliente.",
+      "stories": ["HU7", "HU8", "HU9"],
+      "acceptance": [
+        "POST /api/v1/envios crea el envío con estado PENDIENTE y devuelve 201",
+        "El código de seguimiento tiene formato TRK-YYYYMMDD-XXXXXXXX y es único (verificado contra DB)",
+        "Validación Zod: todos los campos obligatorios, peso > 0, dimensiones > 0",
+        "Pantalla 'Crear Envío' coincide con el wireframe (WIFRAME.pdf)",
+        "Tests: creación exitosa, código único, validación de campos, duplicado de código reintenta"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 5,
+      "sprint": 2,
+      "name": "envios_consultar",
+      "title": "Consultar y editar envíos",
+      "description": "El operador puede listar envíos (paginado, filtrable por estado/cliente/código), ver el detalle de uno, editar sus datos y cancelar envíos pendientes.",
+      "stories": ["HU10", "HU11", "HU12", "HU13"],
+      "acceptance": [
+        "GET /api/v1/envios devuelve lista paginada (?page&limit) con filtros ?estado&cliente&codigo",
+        "GET /api/v1/envios/:id devuelve detalle completo incluyendo EventoEnvio",
+        "PATCH /api/v1/envios/:id actualiza campos editables",
+        "DELETE /api/v1/envios/:id cancela (cambia estado a CANCELADO) solo si está en PENDIENTE",
+        "Pantalla 'Consultar Envíos' coincide con el wireframe",
+        "Tests: listar paginado, filtros, detalle, edición, cancelación, cancelación inválida"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 6,
+      "sprint": 3,
+      "name": "rastreo_paquete",
+      "title": "Rastrear paquete (mapa en tiempo real)",
+      "description": "El cliente ingresa un código de seguimiento y ve el estado actual, historial de EventoEnvio y la ubicación del paquete en un mapa Leaflet. El repartidor emite actualizaciones de ubicación vía Socket.IO.",
+      "stories": ["HU14", "HU15", "HU16", "HU17"],
+      "acceptance": [
+        "GET /api/v1/tracking/:codigo devuelve estado actual + array de EventoEnvio (sin auth requerida)",
+        "El repartidor emite evento Socket.IO location:update con { envioId, lat, lng }",
+        "El backend rebroadcast a sala tracking:${envioId}",
+        "El frontend se une a la sala y actualiza el marcador en el mapa Leaflet en tiempo real",
+        "Pantalla 'Rastrear Paquete' coincide con el wireframe (mapa + historial)",
+        "Tests: tracking por código existente, código inexistente, emisión y recepción de Socket.IO"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 7,
+      "sprint": 3,
+      "name": "rutas_gestion",
+      "title": "Gestión de rutas",
+      "description": "El operador crea rutas asignando envíos pendientes, un vehículo disponible y un repartidor. El sistema puede sugerir la ruta óptima. El repartidor ve sus rutas asignadas.",
+      "stories": ["HU18", "HU19", "HU20", "HU21", "HU22"],
+      "acceptance": [
+        "POST /api/v1/rutas crea ruta con envíos, vehículo y repartidor asignados",
+        "GET /api/v1/rutas lista rutas con estado y envíos asignados",
+        "PATCH /api/v1/rutas/:id permite reasignar repartidor o vehículo",
+        "GET /api/v1/rutas/:id/optima sugiere orden óptimo de paradas (heurística o algoritmo simple)",
+        "GET /api/v1/rutas?repartidorId=me devuelve rutas del repartidor autenticado",
+        "Pantalla 'Gestión de Rutas' coincide con el wireframe",
+        "Tests: crear ruta, listar, reasignar, sugerencia de ruta óptima, vista repartidor"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 8,
+      "sprint": 3,
+      "name": "vehiculos_gestion",
+      "title": "Gestión de vehículos",
+      "description": "El operador registra vehículos (placa, modelo, capacidad), consulta disponibilidad y actualiza su estado (DISPONIBLE | EN_RUTA | MANTENIMIENTO | FUERA_SERVICIO).",
+      "stories": ["HU23", "HU24", "HU25", "HU26"],
+      "acceptance": [
+        "POST /api/v1/vehiculos registra vehículo con placa única",
+        "GET /api/v1/vehiculos lista con filtro ?estado",
+        "PATCH /api/v1/vehiculos/:id actualiza estado",
+        "Pantalla 'Gestión de Vehículos' coincide con el wireframe (tabla con placa/modelo/capacidad/estado)",
+        "Tests: registrar, listar, filtrar por estado, actualizar estado, placa duplicada"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 9,
+      "sprint": 4,
+      "name": "entregas_confirmacion",
+      "title": "Confirmación de entrega",
+      "description": "El repartidor ve sus entregas pendientes y completadas, y confirma la entrega adjuntando foto de evidencia y firma del receptor. El sistema actualiza el estado a ENTREGADO y notifica.",
+      "stories": ["HU27", "HU28", "HU29", "HU30", "HU31"],
+      "acceptance": [
+        "GET /api/v1/entregas?repartidorId=me lista entregas pendientes y completadas",
+        "POST /api/v1/envios/:id/confirmar acepta multipart/form-data con foto y firma; actualiza estado a ENTREGADO",
+        "POST /api/v1/envios/:id/fallo registra intento fallido con nota y foto",
+        "Los archivos subidos se validan por MIME (image/jpeg, image/png) y tamaño <= 5MB",
+        "Pantalla 'Vista Repartidor' y 'Confirmación de Entrega' coinciden con el wireframe",
+        "Tests: confirmar exitoso, fallo de entrega, validación de archivos, estado posterior"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 10,
+      "sprint": 4,
+      "name": "incidencias_gestion",
+      "title": "Gestión de incidencias",
+      "description": "El repartidor reporta incidencias (ENTREGA_FALLIDA, CLIENTE_AUSENTE, DAÑO, DIRECCION_INCORRECTA, OTRO). El operador las consulta, cambia su estado y puede reprogramar la entrega.",
+      "stories": ["HU32", "HU33", "HU34"],
+      "acceptance": [
+        "POST /api/v1/incidencias crea incidencia vinculada a un envío",
+        "GET /api/v1/incidencias lista con filtro ?tipo&estado",
+        "PATCH /api/v1/incidencias/:id actualiza estado (ABIERTA | EN_PROCESO | RESUELTA)",
+        "POST /api/v1/envios/:id/reprogramar registra nueva fecha de entrega",
+        "Pantalla 'Incidentes' coincide con el wireframe (tabla código/tipo/descripción/estado)",
+        "Tests: crear incidencia, listar, cambiar estado, reprogramar entrega"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 11,
+      "sprint": 4,
+      "name": "notificaciones",
+      "title": "Sistema de notificaciones",
+      "description": "El sistema emite notificaciones en tiempo real (Socket.IO) y por correo (nodemailer) ante cambios de estado de envíos, asignación de rutas, incidencias y confirmaciones de entrega.",
+      "stories": ["HU35", "HU36", "HU37", "HU38", "HU39"],
+      "acceptance": [
+        "Cada cambio de estado de Envio genera un registro en Notificacion en BD",
+        "GET /api/v1/notificaciones devuelve notificaciones del usuario autenticado (paginadas)",
+        "El backend emite evento Socket.IO notification:new al canal del usuario correspondiente",
+        "Se envía correo (nodemailer) en eventos: envío creado, estado entregado, incidencia reportada",
+        "Pantalla 'Notificaciones' coincide con el wireframe (lista con icono/mensaje/tiempo)",
+        "Tests: creación de notificación, emisión Socket.IO, envío de correo (mock), listar notificaciones"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 12,
+      "sprint": 1,
+      "name": "infra_base",
+      "title": "Infraestructura base (boilerplate + CI)",
+      "description": "Configuración inicial del monorepo: backend Express+TS+Prisma con schema inicial, frontend Vite+React+Shadcn, variables de entorno, ESLint, .gitignore, scripts de init.sh.",
+      "stories": [],
+      "acceptance": [
+        "backend/ arranca con `npm run dev` sin errores",
+        "frontend/ arranca con `npm run dev` en puerto 5173 sin errores",
+        "Schema Prisma incluye todos los modelos del CLAUDE.md (Usuario, Cliente, Operador, Repartidor, Envio, Ruta, Vehiculo, EventoEnvio, Incidencia, Notificacion)",
+        "`npx prisma migrate dev` aplica sin errores",
+        "ESLint pasa en ambos workspaces",
+        "init.sh verifica dependencias y devuelve exit 0 si el entorno está listo"
+      ],
+      "sdd": false,
+      "status": "done"
+    }
+  ]
+}

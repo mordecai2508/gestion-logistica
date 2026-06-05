@@ -1,0 +1,114 @@
+# progress/history.md — Bitácora de sesiones
+
+> Archivo append-only. Nunca borrar entradas. Agregar al final al cerrar cada sesión.
+
+---
+
+_Sin sesiones registradas aún._
+
+---
+
+## Sesión 2026-06-04 — infra_base ✅ DONE
+
+**Feature:** `infra_base` (id: 12, sprint 1, sdd: false)
+**Resultado:** APROBADO por reviewer.
+
+**Resumen:**
+- Creado `backend/` completo: Express + TypeScript + Prisma v5 con schema de 11 modelos y 6 enums, estructura de capas (routes/middlewares/controllers/services/repositories/sockets/types/validators), helmet/cors/rate-limit/socket.io, errorHandler global.
+- Creado `frontend/` completo: Vite + React 18 + TypeScript + TanStack Query + Zustand + Tailwind v3 + Leaflet + axios instance + authStore + router placeholder.
+- `./init.sh` 28/28 ✅ — exit 0.
+- `npm run build` ✅ y `npm run lint` ✅ en ambos workspaces.
+- Decisiones técnicas notables: Prisma v5 (v7 incompatible con schema url = env()), Tailwind v3 (v4 no tiene CLI), ESLint flat config en frontend (generado por Vite v8).
+- Pendiente: `prisma migrate dev` (requiere BD PostgreSQL con DATABASE_URL configurada).
+
+**Próxima feature:** `auth_login` (id: 1, sprint 1, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-04 — auth_login ✅ DONE
+
+**Feature:** `auth_login` (id: 1, sprint 1, sdd: true)
+**Resultado:** APROBADO por reviewer.
+
+**Resumen:**
+- Backend: `POST /auth/login` (accessToken body + refreshToken httpOnly cookie), `POST /auth/refresh` (rotación con detección de replay), `POST /auth/logout` (revocación en BD). Middleware `authMiddleware` para rutas protegidas. RefreshToken opaco almacenado en BD con campo `revocado`.
+- Frontend: `Login.tsx` (react-hook-form + Zod + Toast), `ProtectedRoute.tsx` (guard por rol), `authStore` Zustand, interceptor axios con refresh automático, `useAuth` hook con redirección por rol.
+- Tests: 16/16 backend (mocks Prisma) + 7/7 frontend (vi.mock) = 23/23 ✅.
+- Lint ✅ | Build ✅ | init.sh 28/28 ✅.
+- Pendiente: `prisma migrate dev --name add_refresh_token` (requiere PostgreSQL activo).
+
+**Próxima feature:** `auth_registro` (id: 2, sprint 1, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-04 — auth_registro ✅ DONE
+
+**Feature:** `auth_registro` (id: 2, sprint 1, sdd: true)
+**Resultado:** APROBADO por reviewer (tras 1 ciclo de correcciones).
+
+**Resumen:**
+- Backend: `POST /api/v1/auth/register` con validación Zod (nombre, correo, password≥8, confirmPassword, teléfono, rol), `prisma.$transaction` para crear Usuario + perfil (Cliente/Operador/Repartidor) atómicamente, bcrypt rounds=12, 409 para correo duplicado.
+- Frontend: `Register.tsx` con react-hook-form + Zod, Shadcn Select con Controller para el campo rol, Toast en 409, redirect a `/login` en éxito.
+- Tests: 33/33 backend + 13/13 frontend = 46/46 ✅. Lint ✅ | Build ✅.
+- Correcciones del reviewer: tests R10–R12 con mock de `prisma.$transaction` verificando `tx.cliente/operador/repartidor.create`; test R16 con aserción de `navigate('/login')`; `<select>` nativo reemplazado por Shadcn Select con `Controller`.
+- Pendiente: `prisma migrate dev` (requiere PostgreSQL activo).
+
+**Próxima feature:** `auth_perfil` (id: 3, sprint 1, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-04 — auth_perfil ✅ DONE
+
+**Feature:** `auth_perfil` (id: 3, sprint 1, sdd: true)
+**Resultado:** APROBADO por reviewer en primera pasada.
+
+**Resumen:**
+- Backend: `GET /users/me` y `PATCH /users/me` (protegidos con authMiddleware, PATCH solo acepta nombre/teléfono vía Zod, nunca modifica correo/rol/password). `POST /auth/forgot-password` (token opaco 32 bytes, expiresAt+1h, respuesta 200 siempre). `POST /auth/reset-password` (valida token no expirado/no usado, bcrypt rounds=12, marca usado=true).
+- `mailer.ts` con nodemailer, exportado directamente para jest.mock sin modificar lógica. Variables SMTP en .env.example.
+- Frontend: `Perfil.tsx` (useQuery + useMutation), `ForgotPassword.tsx`, `ResetPassword.tsx` (useSearchParams para token), rutas en router.
+- Tests: 54/54 backend + 23/23 frontend = 77/77 ✅. Lint ✅ | Build ✅ | init.sh 30/30 ✅.
+
+**Próxima feature:** `envios_crear` (id: 4, sprint 2, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-05 — envios_crear ✅ DONE
+
+**Feature:** `envios_crear` (id: 4, sprint 2, sdd: true)
+**Resultado:** APROBADO por reviewer en segunda pasada (post-correcciones).
+
+**Resumen:**
+- Backend: `POST /api/v1/envios` (OPERADOR only): validación Zod, generación de código TRK-YYYYMMDD-XXXXXXXX con 3 reintentos, `prisma.$transaction` crea Envio + EventoEnvio inicial, `AppError` 404 si clienteId no existe, 500 si 3 colisiones. `GET /api/v1/clientes?search=` para el combobox del formulario.
+- Frontend: `CrearEnvio.tsx` (react-hook-form + Zod, combobox de búsqueda de clientes con debounce, Peso/Dimensiones en grid de 2 columnas), `useCrearEnvio` hook (TanStack useMutation), `envioService`, `clienteService`, DTOs en `frontend/src/types/envioTypes.ts`, ruta `/envios/crear` protegida con `ProtectedRoute roles=['OPERADOR']`.
+- Tests: 66/66 backend + 30/30 frontend = 96/96 ✅. Lint ✅ | Build ✅.
+- Correcciones post-review: DTOs movidos a `types/`, test R13 (botón Cancelar), layout Peso/Dimensiones en fila, `clienteId` como combobox con endpoint `GET /api/v1/clientes`.
+
+**Próxima feature:** `envios_consultar` (id: 5, sprint 2, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-05 — envios_consultar ✅ DONE
+
+**Feature:** `envios_consultar` (id: 5, sprint 2, sdd: true)
+**Resultado:** APROBADO por reviewer en primera pasada.
+
+**Resumen:**
+- Backend: `GET /api/v1/envios` (paginado, filtros `estado`/`cliente`/`codigo` AND-logic en Prisma, meta con `total/page/limit/totalPages`), `GET /api/v1/envios/:id` (detalle con `EventoEnvio[]` ordenado por timestamp), `PATCH /api/v1/envios/:id` (edita 6 campos, protege `estado`/`codigoSeguimiento`, `.refine` exige ≥1 campo), `DELETE /api/v1/envios/:id` (cancela solo si PENDIENTE → 409 si no, transacción atómica con EventoEnvio).
+- Frontend: `ConsultarEnvios.tsx` (tabla con badges, buscador, paginación, AlertDialog, botón Nuevo Envío), `EditarEnvioModal.tsx` (Dialog Shadcn + RHF + Zod pre-poblado), `DetalleEnvio.tsx` (línea de tiempo de eventos), 4 hooks (useEnvios, useEnvioDetalle, useEditarEnvio, useCancelarEnvio), rutas `/envios` y `/envios/:id` con orden correcto respecto a `/envios/crear`.
+- Tests: 87/87 backend + 46/46 frontend = 133/133 ✅. Lint ✅ | Build ✅.
+
+**Próxima feature:** `rastreo_paquete` (id: 6, sprint 3, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-05 — rastreo_paquete ✅ DONE
+
+**Feature:** `rastreo_paquete` (id: 6, sprint 3, sdd: true)
+**Resultado:** APROBADO por reviewer en primera pasada.
+
+**Resumen:**
+- Backend: `GET /api/v1/tracking/:codigo` (público, sin auth) devuelve estado + EventoEnvio[] ordenado por timestamp + `ultimaActualizacion`. Socket.IO handler en `sockets/tracking.ts`: valida payload `location:update { envioId, lat, lng }` con Zod, persiste `EventoEnvio` con lat/lng en BD, rebroadcast a sala `tracking:${envioId}` como evento `tracking:location`.
+- Frontend: `RastrearPaquete.tsx` (campo búsqueda por código, badge estado, timestamp), `TrackingMap.tsx` (react-leaflet, marcador actualizable en tiempo real), `EventoTimeline.tsx` (historial de eventos), hooks `useTracking` (REST) y `useTrackingSocket` (Socket.IO), ruta pública `/tracking/:codigo`.
+- Tests: 96/96 backend (9 nuevos en `tracking.test.ts`) + 52/52 frontend (6 nuevos) = 148/148 ✅. Lint ✅ | Build ✅.
+
+**Próxima feature:** `rutas_gestion` (id: 7, sprint 3, sdd: true) → lanzar `spec_author`.
