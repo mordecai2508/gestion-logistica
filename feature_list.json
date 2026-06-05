@@ -12,7 +12,8 @@
     "sprint_1": "Autenticación y Acceso",
     "sprint_2": "Gestión de Envíos",
     "sprint_3": "Rastreo y Logística",
-    "sprint_4": "Entregas, Incidencias y Notificaciones"
+    "sprint_4": "Entregas, Incidencias y Notificaciones",
+    "sprint_5": "UX, Roles y Completitud"
   },
   "features": [
     {
@@ -210,6 +211,119 @@
         "Se envía correo (nodemailer) en eventos: envío creado, estado entregado, incidencia reportada",
         "Pantalla 'Notificaciones' coincide con el wireframe (lista con icono/mensaje/tiempo)",
         "Tests: creación de notificación, emisión Socket.IO, envío de correo (mock), listar notificaciones"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 13,
+      "sprint": 5,
+      "name": "layout_navegacion",
+      "title": "Layout y navegación global",
+      "description": "Componente de layout compartido para el operador: sidebar izquierdo con enlace a cada sección (Dashboard, Envíos, Rutas, Vehículos, Incidencias, Reportes, Usuarios), topbar con buscador, ícono de notificación y menú de perfil. Para el repartidor: barra de navegación inferior mobile (Rutas, Entregas, Mapa, Perfil). El enlace activo queda resaltado según la ruta actual.",
+      "stories": ["HU40", "HU41"],
+      "acceptance": [
+        "El sidebar del operador enlaza a /dashboard, /envios, /rutas, /vehiculos, /incidencias, /reportes, /usuarios",
+        "El enlace activo en el sidebar refleja la ruta actual (clase CSS activa)",
+        "El topbar muestra buscador global, ícono de notificación (badge con contador) y menú de perfil (ver perfil, cerrar sesión)",
+        "La barra inferior del repartidor enlaza a /repartidor/rutas, /repartidor/entregas, /repartidor/mapa, /perfil",
+        "El layout se aplica automáticamente a todas las rutas protegidas de OPERADOR y REPARTIDOR",
+        "En móvil (<768px) el sidebar del operador colapsa a un botón hamburguesa",
+        "Tests: renderizado del sidebar con enlace activo correcto, renderizado de barra repartidor, colapso mobile"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 14,
+      "sprint": 5,
+      "name": "dashboard_operador",
+      "title": "Dashboard del operador",
+      "description": "Pantalla principal del operador tras el login. Muestra métricas globales (total envíos, en ruta, entregados, incidencias abiertas), tabla de envíos recientes, gráfico de torta de envíos por estado, panel de rutas pendientes y panel de vehículos disponibles.",
+      "stories": ["HU42", "HU43", "HU44"],
+      "acceptance": [
+        "GET /api/v1/dashboard/metrics devuelve { totalEnvios, enRuta, entregados, incidenciasAbiertas }",
+        "GET /api/v1/dashboard/envios-recientes devuelve los últimos 5 envíos con código, clienteNombre, estado y createdAt",
+        "La pantalla muestra 4 tarjetas de métricas con los valores de la API",
+        "La pantalla muestra un gráfico de torta (recharts o similar) con la distribución de envíos por estado",
+        "La pantalla muestra un panel 'Rutas Pendientes' con las rutas en estado PENDIENTE (máx. 5)",
+        "La pantalla muestra un panel 'Vehículos Disponibles' con la tabla placa/modelo/estado (máx. 5)",
+        "Pantalla coincide con el wireframe (sección 'Vista Operador / Dashboard')",
+        "Tests: endpoint metrics, endpoint envíos-recientes, renderizado de tarjetas y gráfico"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 15,
+      "sprint": 5,
+      "name": "vista_repartidor",
+      "title": "Vista principal del repartidor",
+      "description": "Pantalla de inicio del repartidor tras el login. Lista sus entregas del día divididas en pestañas Pendientes y Completadas. Cada tarjeta muestra código de envío, dirección destino y rango horario estimado. Desde cada tarjeta navega a la confirmación de entrega.",
+      "stories": ["HU45", "HU46"],
+      "acceptance": [
+        "GET /api/v1/repartidor/entregas devuelve los envíos asignados al repartidor autenticado, separados por estado (pendientes y completados)",
+        "La pantalla muestra pestañas 'Pendientes (n)' y 'Completadas' con el conteo dinámico",
+        "Cada tarjeta muestra: ícono de paquete, codigoSeguimiento, direccionDestino, estado",
+        "Al hacer clic en una tarjeta el repartidor navega a la pantalla de confirmación de entrega (/repartidor/entregas/:id)",
+        "Si no hay entregas pendientes se muestra mensaje vacío 'No tienes entregas pendientes hoy'",
+        "Pantalla coincide con el wireframe (sección 'Vista Repartidor mobile')",
+        "Tests: listar entregas pendientes y completadas, renderizado de tarjetas, navegación a detalle"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 16,
+      "sprint": 5,
+      "name": "mis_envios_cliente",
+      "title": "Mis envíos (vista cliente)",
+      "description": "El cliente autenticado ve la lista de todos sus envíos (paginada, filtrable por estado), puede acceder al rastreo en tiempo real de cada uno y ver el historial de eventos.",
+      "stories": ["HU47", "HU48"],
+      "acceptance": [
+        "GET /api/v1/clientes/me/envios devuelve los envíos del cliente autenticado paginados (?page&limit) con filtro opcional ?estado",
+        "La pantalla 'Mis Envíos' muestra tabla con columnas: Código, Estado (badge color), Destinatario, Fecha creación",
+        "Cada fila tiene botón 'Rastrear' que navega a /tracking/:codigo",
+        "Se muestra paginación inferior cuando hay más de 10 envíos",
+        "Si el cliente no tiene envíos se muestra mensaje 'Aún no tienes envíos registrados'",
+        "Tests: endpoint GET /clientes/me/envios con auth CLIENTE, filtro por estado, 401 sin token, 403 con token OPERADOR"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 17,
+      "sprint": 5,
+      "name": "gestion_repartidores",
+      "title": "Gestión de repartidores",
+      "description": "El operador lista todos los repartidores registrados, consulta el detalle de cada uno (nombre, correo, teléfono, licencia, disponibilidad) y puede actualizar su disponibilidad y número de licencia.",
+      "stories": ["HU49", "HU50", "HU51"],
+      "acceptance": [
+        "GET /api/v1/repartidores devuelve lista paginada de repartidores con filtro ?disponible=true|false",
+        "GET /api/v1/repartidores/:id devuelve detalle del repartidor incluyendo datos de Usuario",
+        "PATCH /api/v1/repartidores/:id actualiza disponible y/o licencia",
+        "Todos los endpoints requieren authMiddleware + roleMiddleware('OPERADOR')",
+        "Pantalla 'Gestión de Repartidores' muestra tabla nombre/correo/licencia/disponibilidad/acciones (ver, editar)",
+        "Tests: listar, filtrar por disponibilidad, detalle, actualizar, 403 con rol incorrecto"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 18,
+      "sprint": 5,
+      "name": "reportes",
+      "title": "Reportes y estadísticas",
+      "description": "El operador consulta reportes de negocio: envíos por estado y por período, tasa de entregas exitosas vs. fallidas, ranking de repartidores por entregas completadas. Permite exportar los datos a CSV.",
+      "stories": ["HU52", "HU53", "HU54"],
+      "acceptance": [
+        "GET /api/v1/reportes/envios?desde=&hasta= devuelve resumen: total por estado y total por día en el período",
+        "GET /api/v1/reportes/repartidores devuelve ranking con id, nombre, totalEntregados, totalFallidos",
+        "GET /api/v1/reportes/envios/export?desde=&hasta= genera y descarga un CSV con los envíos del período",
+        "Todos los endpoints requieren authMiddleware + roleMiddleware('OPERADOR')",
+        "Pantalla 'Reportes' tiene selector de rango de fechas, gráfico de barras de envíos por día y tabla de ranking de repartidores",
+        "Botón 'Exportar CSV' descarga el archivo generado por el endpoint",
+        "Tests: endpoint envios con rango de fechas, endpoint repartidores, generación de CSV, 403 con rol incorrecto"
       ],
       "sdd": true,
       "status": "pending"
