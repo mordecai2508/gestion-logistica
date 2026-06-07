@@ -142,7 +142,7 @@
         "Tests: crear ruta, listar, reasignar, sugerencia de ruta óptima, vista repartidor"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "id": 8,

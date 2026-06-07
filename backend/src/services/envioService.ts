@@ -13,6 +13,7 @@ import {
   CancelarEnvioResponseDto,
 } from '../types/envioTypes';
 import type { ListarEnviosInput } from '../validators/envioValidator';
+import { rutaService } from './rutaService';
 
 async function generarCodigoUnico(): Promise<string> {
   const INTENTOS_MAX = 3;
@@ -168,6 +169,11 @@ export const envioService = {
     }
 
     const envio = await envioRepository.cancelar(id);
+
+    // R22/R23: Check if route should be closed
+    if (existente.rutaId !== null) {
+      await rutaService.verificarCierreRuta(existente.rutaId);
+    }
 
     return {
       id: envio.id,

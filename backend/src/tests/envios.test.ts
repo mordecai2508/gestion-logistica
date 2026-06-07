@@ -44,6 +44,8 @@ function makeEnvioRecord(overrides: Partial<{
   createdAt: Date;
   updatedAt: Date;
   rutaId: string | null;
+  lat: number | null;
+  lng: number | null;
   evidenciaFoto: string | null;
   firma: string | null;
   fechaReprogramacion: Date | null;
@@ -62,6 +64,8 @@ function makeEnvioRecord(overrides: Partial<{
     createdAt: new Date('2026-06-04T00:00:00.000Z'),
     updatedAt: new Date('2026-06-04T00:00:00.000Z'),
     rutaId: null,
+    lat: null,
+    lng: null,
     evidenciaFoto: null,
     firma: null,
     fechaReprogramacion: null,

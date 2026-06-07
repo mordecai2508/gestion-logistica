@@ -48,3 +48,27 @@ devolverte solo la referencia, no el contenido completo.
   directamente, sin lanzar subagentes.
 - Cambios fuera de `backend/` y `frontend/` (docs, configuración, `progress/`) →
   puedes editarlos tú mismo.
+
+## Comandos de referencia
+
+Monorepo sin workspaces: cada comando se ejecuta desde `backend/` o `frontend/`.
+Útiles para verificar el trabajo de un subagente o para instruirlo correctamente
+(no para implementar tú mismo).
+
+| Acción | Backend | Frontend |
+|---|---|---|
+| Dev server | `npm run dev` (puerto `PORT` de `.env`, default 3001) | `npm run dev` (Vite, default 5173) |
+| Build | `npm run build` | `npm run build` |
+| Lint | `npm run lint` | `npm run lint` |
+| Suite de tests | `npm test` (Jest + Supertest) | `npm test` (Vitest) |
+| Un solo archivo de test | `npx jest src/tests/envios.test.ts` | `npx vitest run src/features/rutas/rutas.test.tsx` |
+| Migraciones Prisma | `npx prisma migrate dev --name <nombre>` | — |
+
+`./init.sh` en la raíz corre lint + tests de ambos paquetes y valida
+`feature_list.json`/`specs/`; es el comando de verificación canónico antes de
+cerrar una feature (ver `docs/verification.md`).
+
+Para probar flujos de correo (recuperación de contraseña, notificaciones) sin
+SMTP real: `docker compose -f docker-compose.mail.yml up -d` levanta Mailpit
+(SMTP en `localhost:1025`, UI en `http://localhost:8025`). Configura
+`backend/.env` con `SMTP_HOST=localhost` y `SMTP_PORT=1025` (ver `.env.example`).

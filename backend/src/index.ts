@@ -13,6 +13,7 @@ import { enviosRouter } from './routes/envios';
 import { clientesRouter } from './routes/clientes';
 import { trackingRouter } from './routes/tracking';
 import { registerTrackingHandlers } from './sockets/tracking';
+import { rutasRouter } from './routes/rutas';
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/api/v1/users/me', usersRouter);
 app.use('/api/v1/envios', enviosRouter);
 app.use('/api/v1/clientes', clientesRouter);
 app.use('/api/v1/tracking', trackingRouter);
+app.use('/api/v1/rutas', rutasRouter);
 
 app.use(errorHandler);
 

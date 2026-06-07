@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
-import { app, server } from '../index';
+import { app, server, io } from '../index';
 import { trackingRepository } from '../repositories/trackingRepository';
 import { envioRepository } from '../repositories/envioRepository';
 import { EstadoEnvio } from '@prisma/client';
@@ -35,6 +35,8 @@ function makeEnvioBase(overrides: Partial<{
   clienteId: string;
   createdAt: Date;
   updatedAt: Date;
+  lat: number | null;
+  lng: number | null;
 }> = {}) {
   return {
     id: 'envio-track-1',
@@ -45,6 +47,8 @@ function makeEnvioBase(overrides: Partial<{
     estado: EstadoEnvio.PENDIENTE,
     clienteId: 'cliente-1',
     rutaId: null,
+    lat: null,
+    lng: null,
     evidenciaFoto: null,
     firma: null,
     fechaReprogramacion: null,
@@ -240,6 +244,19 @@ describe('rastreo_paquete', () => {
     afterEach(() => {
       clientSocket.disconnect();
       listenerSocket.disconnect();
+    });
+
+    // El servidor HTTP/Socket.IO se levanta en un puerto efímero en el primer
+    // beforeEach de este bloque (con el guard `if (!server.listening)`) y se
+    // reutiliza entre los tests. Si nunca se cierra, el listener TCP y los
+    // timers internos de heartbeat de Socket.IO (pingInterval/pingTimeout)
+    // mantienen vivo el event loop y el proceso de Jest nunca termina de
+    // salir. Se cierra una única vez aquí, al finalizar todos los tests de
+    // Socket.IO de este archivo.
+    afterAll((done) => {
+      io.close(() => {
+        server.close(() => done());
+      });
     });
 
     it('R8 — debe emitir tracking:location a la sala tracking:${envioId} al recibir location:update válido', (done) => {

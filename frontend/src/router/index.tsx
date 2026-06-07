@@ -9,6 +9,8 @@ import { CrearEnvio } from '@/features/envios/CrearEnvio';
 import { ConsultarEnvios } from '@/features/envios/ConsultarEnvios';
 import { DetalleEnvio } from '@/features/envios/DetalleEnvio';
 import { RastrearPaquete } from '@/features/tracking/RastrearPaquete';
+import { GestionRutas } from '@/features/rutas/GestionRutas';
+import { RutaDetalle } from '@/features/rutas/RutaDetalle';
 
 const DashboardPage = () => <div>Dashboard</div>;
 const RepartidorPage = () => <div>Repartidor</div>;
@@ -41,6 +43,9 @@ export function AppRouter() {
           <Route path="/envios/crear" element={<CrearEnvio />} />
           <Route path="/envios" element={<ConsultarEnvios />} />
           <Route path="/envios/:id" element={<DetalleEnvio />} />
+          {/* Gestión de rutas — /rutas must come before /rutas/:id */}
+          <Route path="/rutas" element={<GestionRutas />} />
+          <Route path="/rutas/:id" element={<RutaDetalle />} />
         </Route>
 
         {/* Protected routes — REPARTIDOR */}

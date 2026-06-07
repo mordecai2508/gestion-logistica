@@ -17,6 +17,7 @@ enum EstadoEnvio {
   PENDIENTE
   EN_PREPARACION
   EN_TRANSITO
+  EN_RUTA
   ENTREGADO
   CANCELADO
   FALLIDO
@@ -25,6 +26,7 @@ enum EstadoEnvio {
 enum EstadoRuta {
   PENDIENTE
   EN_CURSO
+  EN_PROGRESO
   COMPLETADA
   CANCELADA
 }
@@ -99,6 +101,8 @@ model Envio {
   dimensiones         String
   descripcion         String?
   estado              EstadoEnvio @default(PENDIENTE)
+  lat                 Float?
+  lng                 Float?
   clienteId           String
   rutaId              String?
   evidenciaFoto       String?
@@ -115,6 +119,7 @@ model Envio {
 
 model Ruta {
   id           String     @id @default(cuid())
+  codigo       String     @unique
   nombre       String?
   estado       EstadoRuta @default(PENDIENTE)
   repartidorId String

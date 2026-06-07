@@ -3,13 +3,14 @@ import { Rol } from '@prisma/client';
 import { AppError } from '../lib/appError';
 
 export const roleMiddleware =
-  (rol: Rol) =>
+  (rol: Rol | Rol[]) =>
   (req: Request, _res: Response, next: NextFunction): void => {
-    if (req.user?.rol !== rol) {
+    const roles = Array.isArray(rol) ? rol : [rol];
+    if (req.user?.rol === undefined || !roles.includes(req.user.rol)) {
       return next(
         new AppError(
           'FORBIDDEN',
-          `Acceso denegado: se requiere rol ${rol}`,
+          `Acceso denegado: se requiere rol ${roles.join(' o ')}`,
           403,
         ),
       );
