@@ -112,3 +112,21 @@ _Sin sesiones registradas aún._
 - Tests: 96/96 backend (9 nuevos en `tracking.test.ts`) + 52/52 frontend (6 nuevos) = 148/148 ✅. Lint ✅ | Build ✅.
 
 **Próxima feature:** `rutas_gestion` (id: 7, sprint 3, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-06 — rutas_gestion ✅ DONE
+
+**Feature:** `rutas_gestion` (id: 7, sprint 3, sdd: true)
+**Resultado:** APROBADO por reviewer en segunda pasada (post-correcciones).
+
+**Resumen:**
+- Backend: `POST /api/v1/rutas` (crea ruta con envíos+vehículo+repartidor vía `prisma.$transaction`), `GET /api/v1/rutas` (lista con filtros, incluye `?repartidorId=me`), `GET /api/v1/rutas/:id`, `PATCH /api/v1/rutas/:id` (reasigna repartidor/vehículo), `GET /api/v1/rutas/:id/optima` (heurística de orden óptimo de paradas), cierre automático de ruta (`verificarCierreRuta`) cuando todos sus envíos llegan a estado terminal.
+- Frontend: `GestionRutas.tsx`, `RutaCard.tsx`, `RutaDetalle.tsx`, `RutaForm.tsx`, `EnvioCheckboxList.tsx`, hooks `useRutas`/`useRutaDetalle`/`useCrearRuta`/`useReasignarRuta`/`useRutaOptima`, `rutaService`, tipos en `types/rutaTypes.ts`, ruta `/rutas` en el router.
+- **Ronda 1 — RECHAZADO** (`progress/review_rutas_gestion.md`): 5 tests stub (`R7,R8,R16,R22,R23` con `expect(true).toBe(true)`), violación de arquitectura (`rutaService.ts` instanciaba su propio `PrismaClient` con 11 accesos directos a Prisma en vez de pasar por `rutaRepository`), `R22/R23` código inalcanzable (`verificarCierreRuta` solo se invoca desde `envioService.cancelar`, que exige `estado=PENDIENTE`, imposible para envíos ya asignados a ruta), `GestionRutas.tsx`/`RutaDetalle.tsx` con arreglos hardcodeados vacíos (pantalla inerte), enum `EstadoRuta` con 5 valores redundantes (`EN_CURSO`/`EN_PROGRESO`).
+- **Ronda 2 — correcciones (A–E) y APROBADO**: refactor completo de `rutaService.ts` (cero accesos directos a Prisma, todo vía `rutaRepository` con nuevos métodos `findEnviosByIds/findVehiculoById/findRepartidorById/findRepartidorByUsuarioId/crearConTransaccion/reasignarConTransaccion/cerrarRutaConTransaccion`); 5 stubs reemplazados por tests reales (`jest.isolateModules` + mocks de repositorio), verificados como no-stub mediante mutation testing (reviewer mutó `rutaService.ts` 3 veces, confirmó que los tests fallan, y revirtió); `enviosDisponibles` conectado al hook real `useEnvios({estado:'PENDIENTE'})`; selectores de vehículo/repartidor dejados honestamente vacíos con notas "NOTA DE ALCANCE" documentando dependencia de `vehiculos_gestion` (id 8, aún `pending`); R22/R23 aceptado como limitación documentada (resolución opción a) ya que `entregas_confirmacion` (id 9) sigue `pending`.
+- Bugfix de infraestructura incluido en el mismo commit: `tracking.test.ts` no cerraba el servidor HTTP/Socket.IO (`server`/`io`) tras sus tests, dejando vivo el listener TCP y los timers de heartbeat — causaba que Jest nunca saliera (`Jest did not exit...`). Fix: `afterAll((done) => io.close(() => server.close(() => done())))`. Detalle en `progress/impl_fix_tracking_test_hang.md`.
+- Tests: 118/118 backend (22/22 en `rutas.test.ts`) + 59/59 frontend (7/7 en `rutas.test.tsx`) ✅. Lint ✅ | Build ✅.
+- Commit: `31a7279 feat(rutas_gestion): Gestión de rutas`.
+
+**Próxima feature:** `vehiculos_gestion` (id: 8, sprint 3, sdd: true) → lanzar `spec_author`.

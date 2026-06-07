@@ -11,6 +11,7 @@ import { DetalleEnvio } from '@/features/envios/DetalleEnvio';
 import { RastrearPaquete } from '@/features/tracking/RastrearPaquete';
 import { GestionRutas } from '@/features/rutas/GestionRutas';
 import { RutaDetalle } from '@/features/rutas/RutaDetalle';
+import { GestionVehiculos } from '@/features/vehiculos/GestionVehiculos';
 
 const DashboardPage = () => <div>Dashboard</div>;
 const RepartidorPage = () => <div>Repartidor</div>;
@@ -46,6 +47,9 @@ export function AppRouter() {
           {/* Gestión de rutas — /rutas must come before /rutas/:id */}
           <Route path="/rutas" element={<GestionRutas />} />
           <Route path="/rutas/:id" element={<RutaDetalle />} />
+          {/* Gestión de vehículos (id 8) — el enlace "Vehículos" del sidebar
+              de layout_navegacion (aún pending) deberá apuntar a esta ruta. */}
+          <Route path="/vehiculos" element={<GestionVehiculos />} />
         </Route>
 
         {/* Protected routes — REPARTIDOR */}
