@@ -159,7 +159,7 @@
         "Tests: registrar, listar, filtrar por estado, actualizar estado, placa duplicada"
       ],
       "sdd": true,
-      "status": "in_progress"
+      "status": "done"
     },
     {
       "id": 9,

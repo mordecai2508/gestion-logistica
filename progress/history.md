@@ -130,3 +130,23 @@ _Sin sesiones registradas aún._
 - Commit: `31a7279 feat(rutas_gestion): Gestión de rutas`.
 
 **Próxima feature:** `vehiculos_gestion` (id: 8, sprint 3, sdd: true) → lanzar `spec_author`.
+
+---
+
+## Sesión 2026-06-06/07 — vehiculos_gestion ✅ DONE
+
+**Feature:** `vehiculos_gestion` (id: 8, sprint 3, sdd: true)
+**Resultado:** APROBADO por reviewer en segunda pasada (post-correcciones).
+
+**Resumen:**
+- `spec_author` redactó `specs/vehiculos_gestion/{requirements,design,tasks}.md` (R1–R20 / T1–T17). Reutiliza el modelo `Vehiculo`/enum `EstadoVehiculo` ya existentes en el schema (creados durante `rutas_gestion`) — **sin migración nueva**. Diseño aprobado por el humano sin cambios.
+- Backend: `POST/GET/PATCH /api/v1/vehiculos` (placa única → 409, filtro `?estado`, actualización de estado con regla R14 de transición bloqueada `EN_RUTA → MANTENIMIENTO/FUERA_SERVICIO` → 422), `vehiculoRepository`/`vehiculoService`/`vehiculoController`/`vehiculoValidator` (Zod) respetando estrictamente `controller→service→repository→Prisma`. Endpoint `GET /api/v1/vehiculos?estado=DISPONIBLE` queda como contrato consumible por `rutas_gestion` (selectores hoy vacíos).
+- Frontend: `GestionVehiculos.tsx`, `VehiculoForm.tsx`, `VehiculoTable.tsx`, `ActualizarEstadoVehiculo.tsx`, hooks `useVehiculos`/`useCrearVehiculo`/`useActualizarEstadoVehiculo`, ruta `/vehiculos` protegida con `ProtectedRoute allowedRoles={['OPERADOR']}`.
+- **Ronda 1 — RECHAZADO** (`progress/review_vehiculos_gestion.md`): único hallazgo bloqueante — `vehiculos.test.ts` mockeaba `vehiculoService` por completo (`jest.mock`), dejando R1, R2, R6, R7, R11, R13 y sobre todo **R14** sin cobertura real. El reviewer lo demostró invirtiendo la condición de R14 en el servicio: las 15 pruebas seguían en verde.
+- **Ronda 2 — corrección y APROBADO**: el implementer agregó 11 tests reales (15→26) en un bloque que carga la implementación REAL de `vehiculoService` vía `jest.isolateModules`+`jest.unmock` con solo `vehiculoRepository` mockeado (replicando el patrón aprobado de `rutas.test.ts`), cubriendo R1, R2, R6, R7, R11, R13 y R14 (5 casos). El reviewer repitió la mutación de R14 desde cero de forma independiente: 5/26 tests fallan exactamente como predicho, reveritó sin residuos (diff byte-a-byte). Observación menor de tipos `Date` vs `string` se dejó intencionalmente igual a `rutaTypes.ts` (precedente aprobado).
+- Tests: 144/144 backend (26/26 en `vehiculos.test.ts`, +11 desde ronda 1) + 66/66 frontend (7/7 en `vehiculos.test.tsx`) ✅. Lint ✅ | Build ✅ | `./init.sh` 30/30 ✅.
+- Commit: `4b015f7 feat(vehiculos_gestion): Gestión de vehículos`.
+
+**Próxima feature:** `entregas_confirmacion` (id: 9, sprint 4, sdd: true) → lanzar `spec_author`.
+
+---
