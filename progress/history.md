@@ -41,6 +41,56 @@ _Sin sesiones registradas aún._
 
 ---
 
+## Sesión 2026-06-07 — entregas_confirmacion ✅ DONE
+
+**Feature:** `entregas_confirmacion` (id: 9, sprint 4, sdd: true)
+**Resultado:** APROBADO por reviewer. Commit `60c309c`.
+
+**Resumen:**
+- Spec aprobado por el humano tras una corrección mía: R2/`design.md` debían
+  incluir `EN_PREPARACION` entre los estados "pendiente" (si no, esos envíos
+  desaparecían de ambas pestañas del frontend, violando R26).
+- Backend: `GET /api/v1/entregas?repartidorId=me`, `POST /api/v1/envios/:id/confirmar`
+  y `POST /api/v1/envios/:id/fallo` — multer (memoryStorage, validación MIME +
+  5MB), almacenamiento en `backend/uploads/entregas/<envioId>/...`, servido vía
+  `express.static('/uploads')`. Capas repository/service/controller respetadas,
+  transacciones Prisma para envío+evento(+incidencia), `Notificacion` al cliente.
+- Frontend: `VistaRepartidor.tsx` (pestañas Pendientes/Completadas + nuevo
+  primitivo `tabs.tsx`), `ConfirmacionEntrega.tsx` (captura de foto, firma por
+  canvas→Blob, confirmación y modal de incidencia), hooks TanStack Query,
+  rutas registradas antes del catch-all `/repartidor/*`.
+- El `implementer` necesitó 4 corridas (3 cortes de conexión por socket error en
+  corridas largas; recuperación verificando el repo en disco y relanzando con
+  instrucciones de continuación). Se detectó y corrigió una violación de la
+  regla "prohibido `any` explícito" (`as any` x6 en un test) antes de avanzar.
+- **Discrepancia detectada en la verificación final**: el autorreporte del
+  implementer afirmaba "todas las tasks marcadas `[x]` excepto T31", pero
+  `tasks.md` solo tenía T1–T15 marcadas. Verifiqué el trabajo real (no el
+  autorreporte): código revisado archivo por archivo, 0 `any`/`console.log`/
+  `alert`, y re-ejecuté yo mismo backend (174/174 tests, lint, build) y
+  frontend (73/73 tests, lint, build) — coincidieron exactamente con lo
+  reportado. Conclusión: el trabajo de T16–T30 estaba genuinamente completo;
+  solo faltaba marcar las casillas. Las marqué yo mismo (specs/ es editable
+  por el leader). T31 (verificación manual con Mailpit) queda correctamente
+  sin marcar.
+- `reviewer` validó trazabilidad completa 32/32 (R1–R32) abriendo cada test,
+  no solo el nombre — **APROBADO**. Único hallazgo no bloqueante: entrada
+  duplicada `backend/uploads/` en `.gitignore` (el implementer documentó haber
+  tocado `backend/.gitignore`, que no existe — era el `.gitignore` raíz);
+  limpié el duplicado yo mismo.
+- Tests: backend 174/174 (12 suites) ✅ | frontend 73/73 (15 suites) ✅ |
+  lint ✅ ambos | build ✅ ambos.
+
+**Lección para próximas sesiones:** no confiar en el recuento de checkboxes ni
+en los números de tests del autorreporte de un subagente — re-ejecutar las
+verificaciones (`grep` de checkboxes, `npm test`/`lint`/`build`) directamente.
+En esta ocasión los números eran correctos, pero el conteo de tasks marcadas
+no lo era.
+
+**Próxima feature:** `incidencias_gestion` (id: 10, sprint 4, sdd: true) → lanzar `spec_author`.
+
+---
+
 ## Sesión 2026-06-04 — auth_registro ✅ DONE
 
 **Feature:** `auth_registro` (id: 2, sprint 1, sdd: true)
