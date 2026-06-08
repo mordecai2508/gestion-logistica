@@ -213,7 +213,7 @@
         "Tests: creación de notificación, emisión Socket.IO, envío de correo (mock), listar notificaciones"
       ],
       "sdd": true,
-      "status": "in_progress"
+      "status": "done"
     },
     {
       "id": 13,

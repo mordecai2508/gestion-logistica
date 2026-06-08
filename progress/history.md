@@ -262,3 +262,22 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `notificaciones` (id: 11, sprint 4, sdd: true) → lanzar `spec_author`.
 
 ---
+
+## Sesión 2026-06-08 — notificaciones ✅ DONE
+
+**Feature:** `notificaciones` (id: 11, sprint 4, sdd: true)
+**Resultado:** APROBADO por reviewer en segunda pasada (post-corrección). Commit `4888b01`.
+
+**Resumen:**
+- `spec_author` redactó `specs/notificaciones/{requirements,design,tasks.md}` (R1–R19 / T1–T20 inicial). Detectó 6 decisiones técnicas no triviales para aprobación humana. El humano aprobó con 3 cambios: (1) migración Prisma para agregar enum `TipoNotificacion` + columna `tipo` al modelo `Notificacion` (en lugar de la heurística de derivación por texto propuesta como respaldo); (2) ampliar el alcance con endpoint `PATCH /:id/leer` para marcar notificaciones como leídas (nuevos R20–R23 y tasks); (3) habilitar la pantalla `/notificaciones` para los 3 roles (CLIENTE, OPERADOR, REPARTIDOR). Tras la revisión del spec: R1–R23, T1–T21.
+- **Migración Prisma**: `add_tipo_notificacion` — agrega enum `TipoNotificacion` (5 valores: ENVIO_CREADO, CAMBIO_ESTADO, ENTREGA_REALIZADA, RUTA_ASIGNADA, INCIDENCIA_REPORTADA) y columna `tipo` (no nula) a `Notificacion`.
+- **Backend**: `GET /api/v1/notificaciones` (paginado, cualquier rol autenticado, filtra por `req.user.id`), `PATCH /api/v1/notificaciones/:id/leer` (marca `leida=true`, verifica pertenencia al usuario — 404 unificado si no existe o es de otro usuario). Middleware `io.use` de autenticación JWT de sockets (verifica `socket.handshake.auth.token`, auto-join server-side a sala privada `user:${userId}`). Función `notificacionService.notificar()` como punto único de orquestación (persistencia + emisión Socket.IO + correo). Integración en `envioService`, `rutaService`, `incidenciaService`, `entregaService` (migración de las llamadas directas a `entregaRepository.crearNotificacion` ya existentes al punto único). `sendNotificationEmail` añadida a `mailer.ts` con guard `NODE_ENV=test`.
+- **Frontend**: `Notificaciones.tsx` (lista con ícono/color por `tipo`, paginación, estado vacío, botón "marcar como leída"), `useNotificaciones`/`useNotificacionesSocket`/`useMarcarNotificacionLeida`, `notificacionService`, `formatTiempoRelativo` (`Intl.RelativeTimeFormat` nativo, sin nueva dependencia), ruta `/notificaciones` para 3 roles, `socket.ts` actualizado con `auth` callback que envía `accessToken`.
+- `docs/architecture.md` actualizado con `/notificaciones` disponible para los 3 roles.
+- **Ronda 1 — RECHAZADO**: R5 tenía el bloque `describe` vacío de la prueba real — solo se ejecutaba la verificación de persistencia (R6) sin probar la emisión Socket.IO (`io.to(...).emit(...)`).
+- **Ronda 2 — corrección y APROBADO**: implementer agregó test con `jest.isolateModules` + mock de `getIo()` con spies `toSpy`/`emitSpy`; el reviewer lo verificó con mutación del servicio (confirmó que falla si se omite el emit) y revirtió limpiamente.
+- Tests: backend 238/238 ✅ | frontend 102/102 ✅ | lint ✅ ambos | build ✅ ambos | `./init.sh` 30/30 ✅.
+
+**Próxima feature:** `layout_navegacion` (id: 13, sprint 5, sdd: true) → lanzar `spec_author`.
+
+---
