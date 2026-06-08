@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import path from 'path';
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
@@ -15,6 +16,7 @@ import { trackingRouter } from './routes/tracking';
 import { registerTrackingHandlers } from './sockets/tracking';
 import { rutasRouter } from './routes/rutas';
 import { vehiculosRouter } from './routes/vehiculos';
+import { entregasRouter } from './routes/entregas';
 
 const app = express();
 
@@ -25,6 +27,7 @@ const corsOptions = {
 
 app.use(helmet());
 app.use(cors(corsOptions));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -41,6 +44,7 @@ app.use('/api/v1/clientes', clientesRouter);
 app.use('/api/v1/tracking', trackingRouter);
 app.use('/api/v1/rutas', rutasRouter);
 app.use('/api/v1/vehiculos', vehiculosRouter);
+app.use('/api/v1/entregas', entregasRouter);
 
 app.use(errorHandler);
 

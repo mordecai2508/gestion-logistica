@@ -177,7 +177,7 @@
         "Tests: confirmar exitoso, fallo de entrega, validación de archivos, estado posterior"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "id": 10,

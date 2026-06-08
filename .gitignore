@@ -43,8 +43,9 @@ coverage/
 *.tmp
 *.temp
 
-# Uploads (photos, signatures - never in git)
+# Uploads (photos, signatures - never in git; incluye evidencia de entregas: fotos y firmas)
 backend/uploads/
+uploads/
 
 # Compiled frontend
 frontend/dist/

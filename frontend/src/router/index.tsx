@@ -12,6 +12,8 @@ import { RastrearPaquete } from '@/features/tracking/RastrearPaquete';
 import { GestionRutas } from '@/features/rutas/GestionRutas';
 import { RutaDetalle } from '@/features/rutas/RutaDetalle';
 import { GestionVehiculos } from '@/features/vehiculos/GestionVehiculos';
+import { VistaRepartidor } from '@/features/repartidor/VistaRepartidor';
+import { ConfirmacionEntrega } from '@/features/repartidor/ConfirmacionEntrega';
 
 const DashboardPage = () => <div>Dashboard</div>;
 const RepartidorPage = () => <div>Repartidor</div>;
@@ -54,6 +56,12 @@ export function AppRouter() {
 
         {/* Protected routes — REPARTIDOR */}
         <Route element={<ProtectedRoute allowedRoles={['REPARTIDOR']} />}>
+          {/* Entregas (id 9) — rutas específicas antes del catch-all /repartidor/* */}
+          <Route path="/repartidor/entregas" element={<VistaRepartidor />} />
+          <Route
+            path="/repartidor/entregas/:id/confirmar"
+            element={<ConfirmacionEntrega />}
+          />
           <Route path="/repartidor/*" element={<RepartidorPage />} />
         </Route>
 
