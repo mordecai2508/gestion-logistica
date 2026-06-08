@@ -11,6 +11,8 @@ import {
   EditarEnvioDto,
   PaginatedEnviosResponse,
   CancelarEnvioResponseDto,
+  ReprogramarEnvioDto,
+  ReprogramarEnvioResponseDto,
 } from '../types/envioTypes';
 import type { ListarEnviosInput } from '../validators/envioValidator';
 import { rutaService } from './rutaService';
@@ -179,6 +181,36 @@ export const envioService = {
       id: envio.id,
       codigoSeguimiento: envio.codigoSeguimiento,
       estado: envio.estado,
+    };
+  },
+
+  async reprogramar(id: string, dto: ReprogramarEnvioDto): Promise<ReprogramarEnvioResponseDto> {
+    const existente = await envioRepository.findById(id);
+    if (existente === null) {
+      throw new AppError('ENVIO_NOT_FOUND', 'Envío no encontrado', 404);
+    }
+
+    if (existente.estado === 'ENTREGADO' || existente.estado === 'CANCELADO') {
+      throw new AppError(
+        'INVALID_STATE_TRANSITION',
+        'No se puede reprogramar un envío en estado terminal',
+        409,
+      );
+    }
+
+    const fechaIso = dto.fechaReprogramacion.toISOString();
+    const descripcionEvento = `Entrega reprogramada para ${fechaIso}`;
+
+    const envio = await envioRepository.reprogramar(id, {
+      fechaReprogramacion: dto.fechaReprogramacion,
+      descripcionEvento,
+    });
+
+    return {
+      id: envio.id,
+      codigoSeguimiento: envio.codigoSeguimiento,
+      estado: envio.estado,
+      fechaReprogramacion: (envio.fechaReprogramacion ?? dto.fechaReprogramacion).toISOString(),
     };
   },
 };

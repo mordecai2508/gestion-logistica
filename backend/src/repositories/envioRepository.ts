@@ -91,4 +91,30 @@ export const envioRepository = {
     ]);
     return envio;
   },
+
+  /**
+   * Registra la nueva fecha de reprogramación del envío y documenta el cambio
+   * en su historial de eventos, todo en una única transacción de base de
+   * datos (mismo patrón que `entregaRepository.confirmarEntrega`/`registrarFallo`).
+   * No modifica `Envio.estado`.
+   */
+  async reprogramar(
+    id: string,
+    data: { fechaReprogramacion: Date; descripcionEvento: string },
+  ): Promise<Envio> {
+    return prisma.$transaction(async (tx) => {
+      const envio = await tx.envio.update({
+        where: { id },
+        data: { fechaReprogramacion: data.fechaReprogramacion },
+      });
+      await tx.eventoEnvio.create({
+        data: {
+          envioId: id,
+          estado: envio.estado,
+          descripcion: data.descripcionEvento,
+        },
+      });
+      return envio;
+    });
+  },
 };

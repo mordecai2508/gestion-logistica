@@ -1,5 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { crearEnvioSchema, listarEnviosSchema, editarEnvioSchema } from '../validators/envioValidator';
+import {
+  crearEnvioSchema,
+  listarEnviosSchema,
+  editarEnvioSchema,
+  reprogramarEnvioSchema,
+} from '../validators/envioValidator';
 import { envioService } from '../services/envioService';
 
 export const crearEnvioHandler = async (
@@ -86,6 +91,25 @@ export const cancelarEnvioHandler = async (
     res.status(200).json({
       data: result,
       message: 'Envío cancelado exitosamente',
+      status: 200,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const reprogramarEnvio = async (
+  req: Request<{ id: string }>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const dto = reprogramarEnvioSchema.parse(req.body);
+    const result = await envioService.reprogramar(id, dto);
+    res.status(200).json({
+      data: result,
+      message: 'Entrega reprogramada',
       status: 200,
     });
   } catch (error) {

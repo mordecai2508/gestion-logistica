@@ -85,3 +85,14 @@ export interface CancelarEnvioResponseDto {
   codigoSeguimiento: string;
   estado: string;
 }
+
+export interface ReprogramarEnvioDto {
+  fechaReprogramacion: Date;
+}
+
+export interface ReprogramarEnvioResponseDto {
+  id: string;
+  codigoSeguimiento: string;
+  estado: string;
+  fechaReprogramacion: string;
+}

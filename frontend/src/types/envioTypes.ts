@@ -95,3 +95,14 @@ export interface PaginatedResponse<T> {
   message: string;
   status: number;
 }
+
+export interface ReprogramarEnvioDto {
+  fechaReprogramacion: string;
+}
+
+export interface ReprogramarEnvioResponseDto {
+  id: string;
+  codigoSeguimiento: string;
+  estado: string;
+  fechaReprogramacion: string;
+}

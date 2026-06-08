@@ -195,7 +195,7 @@
         "Tests: crear incidencia, listar, cambiar estado, reprogramar entrega"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "id": 11,

@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useEntregas } from '@/hooks/useEntregas';
+import { ReportarIncidencia } from './ReportarIncidencia';
 import type { EntregaListItemDto } from '@/types/entregaTypes';
 
 function formatRangoHorario(updatedAt: string): string {
@@ -20,9 +22,10 @@ function formatRangoHorario(updatedAt: string): string {
 interface EntregaCardProps {
   entrega: EntregaListItemDto;
   navegable: boolean;
+  onReportarIncidencia?: (envioId: string) => void;
 }
 
-function EntregaCard({ entrega, navegable }: EntregaCardProps) {
+function EntregaCard({ entrega, navegable, onReportarIncidencia }: EntregaCardProps) {
   const navigate = useNavigate();
 
   const irAConfirmacion = () => {
@@ -38,6 +41,16 @@ function EntregaCard({ entrega, navegable }: EntregaCardProps) {
           </p>
           <p className="truncate text-sm text-gray-700">{entrega.direccionDestino}</p>
           <p className="text-xs text-gray-500">{formatRangoHorario(entrega.updatedAt)}</p>
+          {onReportarIncidencia && (
+            <button
+              type="button"
+              onClick={() => onReportarIncidencia(entrega.id)}
+              aria-label={`Reportar incidencia para ${entrega.codigoSeguimiento}`}
+              className="text-xs text-blue-600 underline-offset-4 hover:underline"
+            >
+              Reportar incidencia
+            </button>
+          )}
         </div>
         {navegable && (
           <button
@@ -56,6 +69,7 @@ function EntregaCard({ entrega, navegable }: EntregaCardProps) {
 
 export function VistaRepartidor() {
   const { data, isLoading, isError } = useEntregas();
+  const [envioIncidenciaId, setEnvioIncidenciaId] = useState<string | null>(null);
 
   const pendientes = data?.pendientes ?? [];
   const completadas = data?.completadas ?? [];
@@ -96,7 +110,12 @@ export function VistaRepartidor() {
                 <p className="text-sm text-gray-500">No tienes entregas pendientes.</p>
               ) : (
                 pendientes.map((entrega) => (
-                  <EntregaCard key={entrega.id} entrega={entrega} navegable />
+                  <EntregaCard
+                    key={entrega.id}
+                    entrega={entrega}
+                    navegable
+                    onReportarIncidencia={setEnvioIncidenciaId}
+                  />
                 ))
               )}
             </TabsContent>
@@ -131,6 +150,13 @@ export function VistaRepartidor() {
           Perfil
         </NavLink>
       </nav>
+
+      {envioIncidenciaId !== null && (
+        <ReportarIncidencia
+          envioId={envioIncidenciaId}
+          onClose={() => setEnvioIncidenciaId(null)}
+        />
+      )}
     </div>
   );
 }

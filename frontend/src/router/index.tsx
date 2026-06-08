@@ -12,6 +12,7 @@ import { RastrearPaquete } from '@/features/tracking/RastrearPaquete';
 import { GestionRutas } from '@/features/rutas/GestionRutas';
 import { RutaDetalle } from '@/features/rutas/RutaDetalle';
 import { GestionVehiculos } from '@/features/vehiculos/GestionVehiculos';
+import { GestionIncidencias } from '@/features/incidencias/GestionIncidencias';
 import { VistaRepartidor } from '@/features/repartidor/VistaRepartidor';
 import { ConfirmacionEntrega } from '@/features/repartidor/ConfirmacionEntrega';
 
@@ -52,6 +53,8 @@ export function AppRouter() {
           {/* Gestión de vehículos (id 8) — el enlace "Vehículos" del sidebar
               de layout_navegacion (aún pending) deberá apuntar a esta ruta. */}
           <Route path="/vehiculos" element={<GestionVehiculos />} />
+          {/* Gestión de incidencias (id 10) */}
+          <Route path="/incidencias" element={<GestionIncidencias />} />
         </Route>
 
         {/* Protected routes — REPARTIDOR */}

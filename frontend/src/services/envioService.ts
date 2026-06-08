@@ -7,6 +7,7 @@ import type {
   EditarEnvioDto,
   EnvioFilters,
   CancelarEnvioResponseDto,
+  ReprogramarEnvioResponseDto,
   PaginatedResponse,
 } from '@/types/envioTypes';
 
@@ -54,6 +55,18 @@ export const envioService = {
       message: string;
       status: number;
     }>(`/envios/${id}`);
+    return res.data.data;
+  },
+
+  async reprogramar(
+    envioId: string,
+    fechaReprogramacion: string,
+  ): Promise<ReprogramarEnvioResponseDto> {
+    const res = await api.post<{
+      data: ReprogramarEnvioResponseDto;
+      message: string;
+      status: number;
+    }>(`/envios/${envioId}/reprogramar`, { fechaReprogramacion });
     return res.data.data;
   },
 };

@@ -7,6 +7,7 @@ import {
   obtenerDetalleHandler,
   editarEnvioHandler,
   cancelarEnvioHandler,
+  reprogramarEnvio,
 } from '../controllers/envioController';
 import {
   confirmarEntrega,
@@ -21,6 +22,14 @@ enviosRouter.get('/', authMiddleware, roleMiddleware('OPERADOR'), listarEnviosHa
 enviosRouter.get('/:id', authMiddleware, roleMiddleware('OPERADOR'), obtenerDetalleHandler);
 enviosRouter.patch('/:id', authMiddleware, roleMiddleware('OPERADOR'), editarEnvioHandler);
 enviosRouter.delete('/:id', authMiddleware, roleMiddleware('OPERADOR'), cancelarEnvioHandler);
+
+// incidencias_gestion (id 10) — reprogramación de entrega por el operador
+enviosRouter.post(
+  '/:id/reprogramar',
+  authMiddleware,
+  roleMiddleware('OPERADOR'),
+  reprogramarEnvio,
+);
 
 // entregas_confirmacion (id 9) — confirmación y fallo de entrega por el repartidor
 enviosRouter.post(

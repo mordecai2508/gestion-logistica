@@ -67,3 +67,13 @@ export const editarEnvioSchema = z
   );
 
 export type EditarEnvioInput = z.infer<typeof editarEnvioSchema>;
+
+export const reprogramarEnvioSchema = z.object({
+  fechaReprogramacion: z.coerce
+    .date({ error: 'fechaReprogramacion debe ser una fecha válida' })
+    .refine((fecha) => fecha.getTime() > Date.now(), {
+      message: 'fechaReprogramacion debe ser una fecha futura',
+    }),
+});
+
+export type ReprogramarEnvioInput = z.infer<typeof reprogramarEnvioSchema>;

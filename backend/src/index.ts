@@ -17,6 +17,7 @@ import { registerTrackingHandlers } from './sockets/tracking';
 import { rutasRouter } from './routes/rutas';
 import { vehiculosRouter } from './routes/vehiculos';
 import { entregasRouter } from './routes/entregas';
+import { incidenciasRouter } from './routes/incidencias';
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use('/api/v1/tracking', trackingRouter);
 app.use('/api/v1/rutas', rutasRouter);
 app.use('/api/v1/vehiculos', vehiculosRouter);
 app.use('/api/v1/entregas', entregasRouter);
+app.use('/api/v1/incidencias', incidenciasRouter);
 
 app.use(errorHandler);
 

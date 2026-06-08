@@ -1,8 +1,13 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Clock } from 'lucide-react';
+import { ChevronLeft, Clock, CalendarClock } from 'lucide-react';
+import { useAuthStore } from '@/store/authStore';
 import { useEnvioDetalle } from '@/hooks/useEnvioDetalle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ReprogramarEntregaModal } from './ReprogramarEntregaModal';
+
+const ESTADOS_TERMINALES = new Set(['ENTREGADO', 'CANCELADO']);
 
 const ESTADO_BADGE: Record<string, string> = {
   PENDIENTE: 'bg-orange-100 text-orange-800',
@@ -27,7 +32,9 @@ function formatDate(iso: string): string {
 export function DetalleEnvio() {
   const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const rol = useAuthStore((state) => state.user?.rol);
   const { data: envio, isLoading, isError } = useEnvioDetalle(id);
+  const [mostrarReprogramar, setMostrarReprogramar] = useState(false);
 
   if (isLoading) {
     return (
@@ -48,11 +55,20 @@ export function DetalleEnvio() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="mx-auto max-w-3xl space-y-6">
-        {/* Back button */}
-        <Button variant="outline" onClick={() => void navigate('/envios')}>
-          <ChevronLeft size={16} className="mr-1" aria-hidden="true" />
-          Volver
-        </Button>
+        {/* Back button + actions */}
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={() => void navigate('/envios')}>
+            <ChevronLeft size={16} className="mr-1" aria-hidden="true" />
+            Volver
+          </Button>
+
+          {rol === 'OPERADOR' && !ESTADOS_TERMINALES.has(envio.estado) && (
+            <Button variant="outline" onClick={() => setMostrarReprogramar(true)}>
+              <CalendarClock size={16} className="mr-1" aria-hidden="true" />
+              Reprogramar entrega
+            </Button>
+          )}
+        </div>
 
         {/* Main card */}
         <Card>
@@ -137,6 +153,10 @@ export function DetalleEnvio() {
           </CardContent>
         </Card>
       </div>
+
+      {mostrarReprogramar && (
+        <ReprogramarEntregaModal envioId={envio.id} onClose={() => setMostrarReprogramar(false)} />
+      )}
     </div>
   );
 }
