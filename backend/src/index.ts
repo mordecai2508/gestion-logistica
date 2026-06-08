@@ -7,6 +7,8 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import { Server } from 'socket.io';
+import jwt, { TokenExpiredError, JsonWebTokenError } from 'jsonwebtoken';
+import { Rol } from '@prisma/client';
 import { errorHandler } from './middlewares/errorHandler';
 import { authRouter } from './routes/auth';
 import { usersRouter } from './routes/users';
@@ -14,10 +16,13 @@ import { enviosRouter } from './routes/envios';
 import { clientesRouter } from './routes/clientes';
 import { trackingRouter } from './routes/tracking';
 import { registerTrackingHandlers } from './sockets/tracking';
+import { registerNotificacionHandlers } from './sockets/notificaciones';
 import { rutasRouter } from './routes/rutas';
 import { vehiculosRouter } from './routes/vehiculos';
 import { entregasRouter } from './routes/entregas';
 import { incidenciasRouter } from './routes/incidencias';
+import { notificacionesRouter } from './routes/notificaciones';
+import { setIo } from './lib/socketServer';
 
 const app = express();
 
@@ -47,16 +52,45 @@ app.use('/api/v1/rutas', rutasRouter);
 app.use('/api/v1/vehiculos', vehiculosRouter);
 app.use('/api/v1/entregas', entregasRouter);
 app.use('/api/v1/incidencias', incidenciasRouter);
+app.use('/api/v1/notificaciones', notificacionesRouter);
 
 app.use(errorHandler);
 
 const server = http.createServer(app);
 
+interface JwtPayload {
+  id: string;
+  correo: string;
+  rol: Rol;
+}
+
 const io = new Server(server, {
   cors: corsOptions,
 });
 
+setIo(io);
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token as string | undefined;
+  if (!token) {
+    return next(new Error('UNAUTHORIZED'));
+  }
+  const jwtSecret = process.env.JWT_SECRET ?? '';
+  try {
+    const payload = jwt.verify(token, jwtSecret) as JwtPayload;
+    socket.data.userId = payload.id;
+    next();
+  } catch (err) {
+    if (err instanceof TokenExpiredError || err instanceof JsonWebTokenError) {
+      next(new Error('UNAUTHORIZED'));
+    } else {
+      next(new Error('UNAUTHORIZED'));
+    }
+  }
+});
+
 io.on('connection', (socket) => {
+  registerNotificacionHandlers(io, socket);
   registerTrackingHandlers(io, socket);
 });
 

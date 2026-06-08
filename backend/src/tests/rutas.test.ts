@@ -6,6 +6,7 @@ import { Rol, EstadoRuta, EstadoVehiculo, EstadoEnvio } from '@prisma/client';
 
 jest.mock('../repositories/rutaRepository');
 jest.mock('../services/rutaService');
+jest.mock('../services/notificacionService');
 
 jest.mock('@prisma/client', () => {
   const original = jest.requireActual<typeof import('@prisma/client')>('@prisma/client');
@@ -16,6 +17,8 @@ jest.mock('@prisma/client', () => {
       vehiculo: { findUnique: jest.fn(), update: jest.fn() },
       repartidor: { findUnique: jest.fn(), findFirst: jest.fn() },
       ruta: { create: jest.fn(), findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn(), count: jest.fn() },
+      notificacion: { create: jest.fn(), findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      usuario: { findUnique: jest.fn() },
       $transaction: jest.fn(),
     })),
   };

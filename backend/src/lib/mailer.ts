@@ -20,6 +20,23 @@ function createMailTransporter() {
 
 const transporter = createMailTransporter();
 
+export async function sendNotificationEmail(
+  correo: string,
+  asunto: string,
+  cuerpoHtml: string,
+): Promise<void> {
+  if (process.env.NODE_ENV === 'test') {
+    return;
+  }
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: correo,
+    subject: asunto,
+    html: cuerpoHtml,
+  });
+}
+
 export async function sendPasswordResetEmail(correo: string, token: string): Promise<void> {
   if (process.env.NODE_ENV === 'test') {
     return;

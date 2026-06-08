@@ -1,9 +1,10 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import { io as ioClient, Socket as ClientSocket } from 'socket.io-client';
 import { app, server, io } from '../index';
 import { trackingRepository } from '../repositories/trackingRepository';
 import { envioRepository } from '../repositories/envioRepository';
-import { EstadoEnvio } from '@prisma/client';
+import { EstadoEnvio, Rol } from '@prisma/client';
 
 jest.mock('../repositories/trackingRepository');
 jest.mock('../repositories/envioRepository');
@@ -15,6 +16,8 @@ jest.mock('@prisma/client', () => {
     PrismaClient: jest.fn().mockImplementation(() => ({
       envio: { findUnique: jest.fn() },
       eventoEnvio: { create: jest.fn() },
+      notificacion: { create: jest.fn(), findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      usuario: { findUnique: jest.fn() },
       $transaction: jest.fn(),
     })),
   };
@@ -210,13 +213,23 @@ describe('rastreo_paquete', () => {
     let listenerSocket: ClientSocket;
 
     beforeEach((done) => {
+      const JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret';
+      const makeSocketToken = (id: string) =>
+        jwt.sign({ id, correo: 'test@example.com', rol: 'REPARTIDOR' as Rol }, JWT_SECRET, {
+          expiresIn: '15m',
+        });
+      const socketOpts = (id: string) => ({
+        transports: ['websocket'] as ['websocket'],
+        auth: { token: makeSocketToken(id) },
+      });
+
       if (!server.listening) {
         server.listen(0, () => {
           const addr = server.address();
           const port = typeof addr === 'object' && addr ? addr.port : 0;
           const url = `http://localhost:${port}`;
-          clientSocket = ioClient(url, { transports: ['websocket'] });
-          listenerSocket = ioClient(url, { transports: ['websocket'] });
+          clientSocket = ioClient(url, socketOpts('user-rep-1'));
+          listenerSocket = ioClient(url, socketOpts('user-listener-1'));
           let connected = 0;
           const onConnect = () => {
             connected += 1;
@@ -229,8 +242,8 @@ describe('rastreo_paquete', () => {
         const addr = server.address();
         const port = typeof addr === 'object' && addr ? addr.port : 0;
         const url = `http://localhost:${port}`;
-        clientSocket = ioClient(url, { transports: ['websocket'] });
-        listenerSocket = ioClient(url, { transports: ['websocket'] });
+        clientSocket = ioClient(url, socketOpts('user-rep-1'));
+        listenerSocket = ioClient(url, socketOpts('user-listener-1'));
         let connected = 0;
         const onConnect = () => {
           connected += 1;

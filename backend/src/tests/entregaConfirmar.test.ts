@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { app } from '../index';
 import { entregaService } from '../services/entregaService';
 import { Rol } from '@prisma/client';
-import type { Envio, EventoEnvio, Notificacion } from '@prisma/client';
+import type { Envio, EventoEnvio } from '@prisma/client';
 import type { ConfirmarEntregaResponseDto } from '../types/entregaTypes';
 import type { EnvioConRutaYCliente } from '../repositories/entregaRepository';
 
@@ -30,6 +30,7 @@ function makeMulterFile(
 jest.mock('../services/entregaService');
 jest.mock('../repositories/entregaRepository');
 jest.mock('../repositories/rutaRepository');
+jest.mock('../services/notificacionService');
 jest.mock('../lib/uploadConfig', () => {
   const actual = jest.requireActual<typeof import('../lib/uploadConfig')>('../lib/uploadConfig');
   return {
@@ -46,7 +47,8 @@ jest.mock('@prisma/client', () => {
       envio: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       eventoEnvio: { create: jest.fn() },
       incidencia: { create: jest.fn() },
-      notificacion: { create: jest.fn() },
+      notificacion: { create: jest.fn(), findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      usuario: { findUnique: jest.fn() },
       repartidor: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     })),
@@ -196,16 +198,21 @@ type EntregaRepoMock = jest.Mocked<
 type RutaRepoMock = jest.Mocked<
   typeof import('../repositories/rutaRepository').rutaRepository
 >;
+type NotificacionServiceMock = jest.Mocked<
+  typeof import('../services/notificacionService').notificacionService
+>;
 type EntregaServiceReal = typeof import('../services/entregaService').entregaService;
 
 function loadServiceWithMockedRepos(): {
   service: EntregaServiceReal;
   entregaRepo: EntregaRepoMock;
   rutaRepo: RutaRepoMock;
+  notifService: NotificacionServiceMock;
 } {
   let service!: EntregaServiceReal;
   let entregaRepo!: EntregaRepoMock;
   let rutaRepo!: RutaRepoMock;
+  let notifService!: NotificacionServiceMock;
 
   jest.isolateModules(() => {
     jest.unmock('../services/entregaService');
@@ -214,15 +221,17 @@ function loadServiceWithMockedRepos(): {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     rutaRepo = require('../repositories/rutaRepository').rutaRepository as RutaRepoMock;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    notifService = require('../services/notificacionService').notificacionService as NotificacionServiceMock;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     service = require('../services/entregaService').entregaService as EntregaServiceReal;
   });
 
-  return { service, entregaRepo, rutaRepo };
+  return { service, entregaRepo, rutaRepo, notifService };
 }
 
 describe('entregaService.confirmarEntrega — lógica de negocio (real + repos mockeados)', () => {
-  it('R8 - debe crear una Notificacion para el cliente al confirmar la entrega', async () => {
-    const { service, entregaRepo, rutaRepo } = loadServiceWithMockedRepos();
+  it('R8 - debe llamar a notificacionService.notificar para el cliente al confirmar la entrega', async () => {
+    const { service, entregaRepo, rutaRepo, notifService } = loadServiceWithMockedRepos();
 
     rutaRepo.findRepartidorByUsuarioId.mockResolvedValue({
       id: 'repartidor-1',
@@ -311,26 +320,26 @@ describe('entregaService.confirmarEntrega — lógica de negocio (real + repos m
       evento: eventoCreado,
     });
 
-    const notificacionCreada: Notificacion = {
+    notifService.notificar.mockResolvedValue({
       id: 'notif-1',
-      usuarioId: 'user-cliente-9',
-      envioId: 'envio-1',
+      tipo: 'ENTREGA_REALIZADA',
       mensaje: 'Tu envío TRK-20260607-AAAA1111 fue entregado',
       leida: false,
-      createdAt: new Date(),
-    };
-    entregaRepo.crearNotificacion.mockResolvedValue(notificacionCreada);
+      envioId: 'envio-1',
+      createdAt: new Date().toISOString(),
+    } as never);
 
     await service.confirmarEntrega('envio-1', 'user-rep-1', {
       foto: makeMulterFile('foto', 'image/jpeg', Buffer.from('x')),
       firma: makeMulterFile('firma', 'image/png', Buffer.from('y')),
     });
 
-    expect(entregaRepo.crearNotificacion).toHaveBeenCalledWith(
+    expect(notifService.notificar).toHaveBeenCalledWith(
       expect.objectContaining({
         usuarioId: 'user-cliente-9',
         envioId: 'envio-1',
         mensaje: expect.stringContaining('entregado'),
+        tipo: 'ENTREGA_REALIZADA',
       }),
     );
   });

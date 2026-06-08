@@ -38,6 +38,14 @@ enum EstadoVehiculo {
   FUERA_SERVICIO
 }
 
+enum TipoNotificacion {
+  ENVIO_CREADO
+  CAMBIO_ESTADO
+  ENTREGA_REALIZADA
+  RUTA_ASIGNADA
+  INCIDENCIA_REPORTADA
+}
+
 enum TipoIncidencia {
   ENTREGA_FALLIDA
   CLIENTE_AUSENTE
@@ -167,14 +175,15 @@ model Incidencia {
 }
 
 model Notificacion {
-  id        String   @id @default(cuid())
+  id        String           @id @default(cuid())
   mensaje   String
-  leida     Boolean  @default(false)
+  tipo      TipoNotificacion
+  leida     Boolean          @default(false)
   usuarioId String
   envioId   String?
-  createdAt DateTime @default(now())
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
-  envio     Envio?   @relation(fields: [envioId], references: [id])
+  createdAt DateTime         @default(now())
+  usuario   Usuario          @relation(fields: [usuarioId], references: [id])
+  envio     Envio?           @relation(fields: [envioId], references: [id])
 }
 
 model PasswordResetToken {

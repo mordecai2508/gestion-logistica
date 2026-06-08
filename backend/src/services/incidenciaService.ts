@@ -2,6 +2,7 @@ import { Prisma, EstadoIncidencia } from '@prisma/client';
 import { incidenciaRepository } from '../repositories/incidenciaRepository';
 import { envioRepository } from '../repositories/envioRepository';
 import { AppError } from '../lib/appError';
+import { notificacionService } from './notificacionService';
 import {
   CrearIncidenciaDto,
   IncidenciaDto,
@@ -42,6 +43,13 @@ export const incidenciaService = {
     }
 
     const incidencia = await incidenciaRepository.crear(dto);
+
+    await notificacionService.notificar({
+      usuarioId: envio.cliente.usuarioId,
+      envioId: dto.envioId,
+      mensaje: `Se reportó una incidencia en tu envío ${envio.codigoSeguimiento}: ${dto.tipo}`,
+      tipo: 'INCIDENCIA_REPORTADA',
+    });
 
     return proyectarIncidencia(incidencia);
   },

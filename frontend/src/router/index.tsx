@@ -15,6 +15,7 @@ import { GestionVehiculos } from '@/features/vehiculos/GestionVehiculos';
 import { GestionIncidencias } from '@/features/incidencias/GestionIncidencias';
 import { VistaRepartidor } from '@/features/repartidor/VistaRepartidor';
 import { ConfirmacionEntrega } from '@/features/repartidor/ConfirmacionEntrega';
+import { Notificaciones } from '@/features/notificaciones/Notificaciones';
 
 const DashboardPage = () => <div>Dashboard</div>;
 const RepartidorPage = () => <div>Repartidor</div>;
@@ -38,6 +39,7 @@ export function AppRouter() {
           }
         >
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/notificaciones" element={<Notificaciones />} />
         </Route>
 
         {/* Protected routes — OPERADOR */}

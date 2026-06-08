@@ -3,13 +3,14 @@ import jwt from 'jsonwebtoken';
 import { app } from '../index';
 import { entregaService } from '../services/entregaService';
 import { Rol } from '@prisma/client';
-import type { Envio, Incidencia, Notificacion } from '@prisma/client';
+import type { Envio, Incidencia } from '@prisma/client';
 import type { RegistrarFalloResponseDto } from '../types/entregaTypes';
 import type { EnvioConRutaYCliente } from '../repositories/entregaRepository';
 
 jest.mock('../services/entregaService');
 jest.mock('../repositories/entregaRepository');
 jest.mock('../repositories/rutaRepository');
+jest.mock('../services/notificacionService');
 jest.mock('../lib/uploadConfig', () => {
   const actual = jest.requireActual<typeof import('../lib/uploadConfig')>('../lib/uploadConfig');
   return {
@@ -26,7 +27,8 @@ jest.mock('@prisma/client', () => {
       envio: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
       eventoEnvio: { create: jest.fn() },
       incidencia: { create: jest.fn() },
-      notificacion: { create: jest.fn() },
+      notificacion: { create: jest.fn(), findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      usuario: { findUnique: jest.fn() },
       repartidor: { findFirst: jest.fn() },
       $transaction: jest.fn(),
     })),
@@ -175,16 +177,21 @@ type EntregaRepoMock = jest.Mocked<
 type RutaRepoMock = jest.Mocked<
   typeof import('../repositories/rutaRepository').rutaRepository
 >;
+type NotificacionServiceMock = jest.Mocked<
+  typeof import('../services/notificacionService').notificacionService
+>;
 type EntregaServiceReal = typeof import('../services/entregaService').entregaService;
 
 function loadServiceWithMockedRepos(): {
   service: EntregaServiceReal;
   entregaRepo: EntregaRepoMock;
   rutaRepo: RutaRepoMock;
+  notifService: NotificacionServiceMock;
 } {
   let service!: EntregaServiceReal;
   let entregaRepo!: EntregaRepoMock;
   let rutaRepo!: RutaRepoMock;
+  let notifService!: NotificacionServiceMock;
 
   jest.isolateModules(() => {
     jest.unmock('../services/entregaService');
@@ -193,10 +200,12 @@ function loadServiceWithMockedRepos(): {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     rutaRepo = require('../repositories/rutaRepository').rutaRepository as RutaRepoMock;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    notifService = require('../services/notificacionService').notificacionService as NotificacionServiceMock;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     service = require('../services/entregaService').entregaService as EntregaServiceReal;
   });
 
-  return { service, entregaRepo, rutaRepo };
+  return { service, entregaRepo, rutaRepo, notifService };
 }
 
 function makeEnvioConRutaYCliente(): EnvioConRutaYCliente {
@@ -281,7 +290,7 @@ const incidenciaCreada: Incidencia = {
 
 describe('entregaService.registrarFallo — lógica de negocio (real + repos mockeados)', () => {
   it('R15 - debe cambiar el estado a FALLIDO y crear la Incidencia ENTREGA_FALLIDA con la nota', async () => {
-    const { service, entregaRepo, rutaRepo } = loadServiceWithMockedRepos();
+    const { service, entregaRepo, rutaRepo, notifService } = loadServiceWithMockedRepos();
 
     rutaRepo.findRepartidorByUsuarioId.mockResolvedValue({
       id: 'repartidor-1',
@@ -295,16 +304,15 @@ describe('entregaService.registrarFallo — lógica de negocio (real + repos moc
       envio: envioFallido,
       incidencia: incidenciaCreada,
     });
-
-    const notificacionCreada: Notificacion = {
+    notifService.notificar.mockResolvedValue({
       id: 'notif-1',
       usuarioId: 'user-cliente-9',
       envioId: 'envio-1',
-      mensaje: 'No fue posible entregar tu envío TRK-20260607-AAAA1111: Cliente ausente',
+      mensaje: 'No fue posible entregar',
+      tipo: 'CAMBIO_ESTADO',
       leida: false,
-      createdAt: new Date(),
-    };
-    entregaRepo.crearNotificacion.mockResolvedValue(notificacionCreada);
+      createdAt: new Date().toISOString(),
+    } as never);
 
     const result = await service.registrarFallo('envio-1', 'user-rep-1', {
       nota: 'Cliente ausente',
@@ -318,8 +326,8 @@ describe('entregaService.registrarFallo — lógica de negocio (real + repos moc
     );
   });
 
-  it('R16 - debe crear una Notificacion para el cliente al registrar el fallo', async () => {
-    const { service, entregaRepo, rutaRepo } = loadServiceWithMockedRepos();
+  it('R16 - debe llamar a notificacionService.notificar para el cliente al registrar el fallo', async () => {
+    const { service, entregaRepo, rutaRepo, notifService } = loadServiceWithMockedRepos();
 
     rutaRepo.findRepartidorByUsuarioId.mockResolvedValue({
       id: 'repartidor-1',
@@ -333,24 +341,23 @@ describe('entregaService.registrarFallo — lógica de negocio (real + repos moc
       envio: envioFallido,
       incidencia: incidenciaCreada,
     });
-
-    const notificacionCreada: Notificacion = {
+    notifService.notificar.mockResolvedValue({
       id: 'notif-1',
-      usuarioId: 'user-cliente-9',
-      envioId: 'envio-1',
-      mensaje: 'No fue posible entregar tu envío TRK-20260607-AAAA1111: Cliente ausente',
+      tipo: 'CAMBIO_ESTADO',
+      mensaje: 'No fue posible entregar',
       leida: false,
-      createdAt: new Date(),
-    };
-    entregaRepo.crearNotificacion.mockResolvedValue(notificacionCreada);
+      envioId: 'envio-1',
+      createdAt: new Date().toISOString(),
+    } as never);
 
     await service.registrarFallo('envio-1', 'user-rep-1', { nota: 'Cliente ausente' });
 
-    expect(entregaRepo.crearNotificacion).toHaveBeenCalledWith(
+    expect(notifService.notificar).toHaveBeenCalledWith(
       expect.objectContaining({
         usuarioId: 'user-cliente-9',
         envioId: 'envio-1',
         mensaje: expect.stringContaining('No fue posible entregar'),
+        tipo: 'CAMBIO_ESTADO',
       }),
     );
   });

@@ -73,9 +73,9 @@ frontend/src/
 
 | Rol | Rutas frontend permitidas |
 |---|---|
-| CLIENTE | `/tracking`, `/mis-envios`, `/notificaciones` |
-| OPERADOR | `/dashboard`, `/envios/*`, `/rutas/*`, `/vehiculos/*`, `/incidencias`, `/reportes` |
-| REPARTIDOR | `/repartidor/*`, `/entregas/*` |
+| CLIENTE | `/tracking`, `/mis-envios`, `/notificaciones`, `/perfil` |
+| OPERADOR | `/dashboard`, `/envios/*`, `/rutas/*`, `/vehiculos/*`, `/incidencias`, `/reportes`, `/notificaciones`, `/perfil` |
+| REPARTIDOR | `/repartidor/*`, `/entregas/*`, `/notificaciones`, `/perfil` |
 
 ---
 

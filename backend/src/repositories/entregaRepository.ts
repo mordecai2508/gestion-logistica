@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Envio, EventoEnvio, Incidencia, Notificacion } from '@prisma/client';
+import { PrismaClient, Prisma, Envio, EventoEnvio, Incidencia } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -110,11 +110,4 @@ export const entregaRepository = {
     });
   },
 
-  async crearNotificacion(data: {
-    usuarioId: string;
-    envioId: string;
-    mensaje: string;
-  }): Promise<Notificacion> {
-    return prisma.notificacion.create({ data });
-  },
 };

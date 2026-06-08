@@ -12,6 +12,7 @@ import type {
   ConfirmarEntregaInput,
   RegistrarFalloInput,
 } from '../types/entregaTypes';
+import { notificacionService } from './notificacionService';
 
 const ESTADOS_PENDIENTES: EstadoEnvio[] = [
   'PENDIENTE',
@@ -126,10 +127,11 @@ export const entregaService = {
       },
     );
 
-    await entregaRepository.crearNotificacion({
+    await notificacionService.notificar({
       usuarioId: envio.cliente.usuarioId,
       envioId,
       mensaje: `Tu envío ${actualizado.codigoSeguimiento} fue entregado`,
+      tipo: 'ENTREGA_REALIZADA',
     });
 
     return {
@@ -158,10 +160,18 @@ export const entregaService = {
       { nota: dto.nota, foto: fotoPath },
     );
 
-    await entregaRepository.crearNotificacion({
+    await notificacionService.notificar({
       usuarioId: envio.cliente.usuarioId,
       envioId,
       mensaje: `No fue posible entregar tu envío ${actualizado.codigoSeguimiento}: ${dto.nota}`,
+      tipo: 'CAMBIO_ESTADO',
+    });
+
+    await notificacionService.notificar({
+      usuarioId: envio.cliente.usuarioId,
+      envioId,
+      mensaje: `Se reportó una incidencia en tu envío ${actualizado.codigoSeguimiento}: ENTREGA_FALLIDA`,
+      tipo: 'INCIDENCIA_REPORTADA',
     });
 
     return {

@@ -8,6 +8,7 @@ import type { IncidenciaDto, PaginatedIncidenciasResponse } from '../types/incid
 jest.mock('../repositories/incidenciaRepository');
 jest.mock('../repositories/envioRepository');
 jest.mock('../services/incidenciaService');
+jest.mock('../services/notificacionService');
 
 jest.mock('@prisma/client', () => {
   const original = jest.requireActual<typeof import('@prisma/client')>('@prisma/client');
@@ -22,6 +23,8 @@ jest.mock('@prisma/client', () => {
         update: jest.fn(),
       },
       envio: { findUnique: jest.fn() },
+      notificacion: { create: jest.fn(), findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      usuario: { findUnique: jest.fn() },
       $transaction: jest.fn(),
     })),
   };

@@ -7,6 +7,7 @@ import { Rol, EstadoEnvio } from '@prisma/client';
 
 jest.mock('../repositories/envioRepository');
 jest.mock('../repositories/clienteRepository');
+jest.mock('../services/notificacionService');
 
 jest.mock('@prisma/client', () => {
   const original = jest.requireActual('@prisma/client');
@@ -16,6 +17,8 @@ jest.mock('@prisma/client', () => {
       envio: { findUnique: jest.fn(), create: jest.fn() },
       eventoEnvio: { create: jest.fn() },
       cliente: { findUnique: jest.fn() },
+      notificacion: { create: jest.fn(), findUnique: jest.fn(), count: jest.fn(), findMany: jest.fn(), update: jest.fn() },
+      usuario: { findUnique: jest.fn() },
       $transaction: jest.fn(),
     })),
   };

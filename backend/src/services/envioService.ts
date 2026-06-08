@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { envioRepository } from '../repositories/envioRepository';
 import { clienteRepository } from '../repositories/clienteRepository';
 import { AppError } from '../lib/appError';
+import { notificacionService } from './notificacionService';
 import {
   CrearEnvioDto,
   EnvioResponseDto,
@@ -45,6 +46,13 @@ export const envioService = {
     const codigoSeguimiento = await generarCodigoUnico();
 
     const envio = await envioRepository.createEnvio({ ...dto, codigoSeguimiento });
+
+    await notificacionService.notificar({
+      usuarioId: cliente.usuarioId,
+      envioId: envio.id,
+      mensaje: `Tu envío ${envio.codigoSeguimiento} fue registrado`,
+      tipo: 'ENVIO_CREADO',
+    });
 
     return {
       id: envio.id,

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { EstadoRuta } from '@prisma/client';
 import { rutaRepository } from '../repositories/rutaRepository';
 import { AppError } from '../lib/appError';
+import { notificacionService } from './notificacionService';
 import {
   CrearRutaDto,
   ReasignarRutaDto,
@@ -155,6 +156,12 @@ export const rutaService = {
       enviosIds: dto.enviosIds,
     });
 
+    await notificacionService.notificar({
+      usuarioId: repartidor.usuarioId,
+      mensaje: `Se te asignó la ruta ${codigo} con ${dto.enviosIds.length} envíos`,
+      tipo: 'RUTA_ASIGNADA',
+    });
+
     return mapRutaToDto(ruta);
   },
 
@@ -262,6 +269,17 @@ export const rutaService = {
       vehiculoId: dto.vehiculoId,
       vehiculoAnteriorId: ruta.vehiculoId,
     });
+
+    if (dto.repartidorId !== undefined) {
+      const nuevoRepartidorConUsuario = await rutaRepository.findRepartidorById(dto.repartidorId);
+      if (nuevoRepartidorConUsuario !== null) {
+        await notificacionService.notificar({
+          usuarioId: nuevoRepartidorConUsuario.usuarioId,
+          mensaje: `Se te reasignó la ruta ${ruta.codigo}`,
+          tipo: 'RUTA_ASIGNADA',
+        });
+      }
+    }
 
     return mapRutaToDto(rutaActualizada);
   },
