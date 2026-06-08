@@ -200,3 +200,65 @@ no lo era.
 **Próxima feature:** `entregas_confirmacion` (id: 9, sprint 4, sdd: true) → lanzar `spec_author`.
 
 ---
+
+## Sesión 2026-06-07/08 — incidencias_gestion ✅ DONE
+
+**Feature:** `incidencias_gestion` (id: 10, sprint 4, sdd: true)
+**Resultado:** APROBADO por reviewer. Commit `3f4905e`.
+
+**Resumen:**
+- `spec_author` redactó `specs/incidencias_gestion/{requirements,design,tasks.md}`
+  (R1–R28 / T1–T23). El modelo `Incidencia`, los enums `TipoIncidencia`/
+  `EstadoIncidencia` y `Envio.fechaReprogramacion` ya existían en el schema —
+  **sin migración nueva**. El humano aprobó el spec incluyendo la solución
+  propuesta para la inconsistencia wireframe-vs-rol del botón "+ Nueva
+  Incidencia" (deshabilitado + tooltip para OPERADOR, ya que el endpoint de
+  creación exige rol REPARTIDOR).
+- Backend: `POST/GET /api/v1/incidencias`, `PATCH /api/v1/incidencias/:id`
+  (transición de estado `ABIERTA → EN_PROCESO → RESUELTA`, terminal, con 409
+  `INVALID_STATE_TRANSITION`) y `POST /api/v1/envios/:id/reprogramar` (valida
+  fecha futura, bloquea envíos `ENTREGADO`/`CANCELADO`, registra `EventoEnvio`
+  en una sola `prisma.$transaction`). Capas repository/service/controller
+  respetadas.
+- Frontend: `GestionIncidencias.tsx` (tabla+filtros+paginación+modal de cambio
+  de estado), `ReportarIncidencia.tsx` (rol REPARTIDOR), `ReprogramarEntregaModal.tsx`
+  (rol OPERADOR, cableado en `DetalleEnvio.tsx`, oculto para envíos
+  `ENTREGADO`/`CANCELADO`), 4 hooks TanStack Query, ruta `/incidencias`
+  protegida con `ProtectedRoute allowedRoles={['OPERADOR']}`.
+- **Incidente operativo notable — bloqueo de permisos en subagentes background**:
+  el primer `implementer` completó T1–T18 pero su autorreporte fue
+  contradictorio (afirmaba "bloqueo total de Edit/Write" y a la vez haber
+  escrito 17 archivos — verifiqué que lo segundo era cierto). Tres relanzamientos
+  posteriores en *background* fracasaron: uno se autodeclaró "leader" por
+  confusión de rol, otro interpretó el prompt de relanzamiento como intento de
+  prompt-injection y se negó a proceder, y un tercero sí adoptó el rol
+  correctamente pero confirmó un bloqueo **real y reproducible**: `Edit`/`Write`/
+  `Bash`-de-escritura devuelven *"Permission to use [Tool] has been denied"* de
+  forma instantánea y automática para subagentes lanzados en background — ningún
+  prompt de aprobación llega al humano, ni siquiera sobre archivos fuera de
+  `backend/`/`frontend/` (p.ej. `progress/current.md`). **Conclusión para
+  futuras sesiones: los subagentes que necesiten escribir código deben lanzarse
+  en *foreground* (síncrono), nunca en background** — ahí los permisos de
+  escritura funcionan con normalidad. Relanzado en foreground, el implementer
+  completó T19–T23 sin incidentes (botón+modal de reprogramación cableado, ruta
+  `/incidencias` registrada, 3 archivos de test frontend nuevos con 15 tests
+  R25–R28/R1/R19–R21, informe en `progress/impl_incidencias_gestion.md`).
+- `reviewer` validó trazabilidad completa 28/28 (R1–R28) con tests reales (no
+  placeholders) — **APROBADO sin correcciones**. Verificó arquitectura
+  (sin lógica de negocio en controllers/repositories, sin `fetch` directo, sin
+  `any`/`console.log`), seguridad (`authMiddleware`+`roleMiddleware` en los 4
+  endpoints, validación Zod, transacciones atómicas) y convenciones
+  (`/api/v1/`, formato `{data,message,status}`, paginación, wireframe).
+- Tests: backend 212/212 ✅ | frontend 88/88 ✅ | lint ✅ ambos | build ✅ ambos |
+  `./init.sh` 30/30 ✅ — todo verificado de forma independiente por el leader y
+  por el reviewer (no solo confiando en el autorreporte del implementer).
+
+**Lección para próximas sesiones:** lanzar siempre los subagentes `implementer`
+(y cualquier otro que necesite `Edit`/`Write`/`Bash`-de-escritura) **en
+foreground**, nunca con `run_in_background: true` — los permisos de escritura
+se deniegan instantáneamente y sin posibilidad de aprobación interactiva para
+agentes en background, sin importar la ruta del archivo.
+
+**Próxima feature:** `notificaciones` (id: 11, sprint 4, sdd: true) → lanzar `spec_author`.
+
+---
