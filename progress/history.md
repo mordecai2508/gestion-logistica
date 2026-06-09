@@ -299,3 +299,21 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `dashboard_operador` (id: 14, sprint 5, sdd: true) → lanzar `spec_author`.
 
 ---
+
+## Sesión 2026-06-08 — dashboard_operador ✅ DONE
+
+**Feature:** `dashboard_operador` (id: 14, sprint 5, sdd: true)
+**Resultado:** APROBADO por reviewer en tercera pasada. Commit `ff57997`.
+
+**Resumen:**
+- Spec: R1–R31, T1–T20. Decisiones aprobadas: recharts como dependencia de producción (mencionada en los criterios de aceptación), gráfico de torta con 3 sectores agrupados (En Ruta / Entregados / Otros) usando datos de `/metrics` sin endpoint adicional.
+- Backend: 4 endpoints nuevos bajo `/api/v1/dashboard/` — `GET /metrics` (4 conteos en `Promise.all` con `prisma.count()`, nunca `findMany` en memoria), `GET /envios-recientes` (últimos 5 con `cliente.usuario.nombre` aplanado), `GET /rutas-pendientes` (máx. 5, estado `PENDIENTE`), `GET /vehiculos-disponibles` (máx. 5, estado `DISPONIBLE`). Todos con `authMiddleware` + `roleMiddleware('OPERADOR')`.
+- Frontend: `recharts` instalado; `MetricCard`, `EnviosPieChart` (PieChart 3 sectores), `EnviosRecientesTable`, `RutasPendientesPanel`, `VehiculosDisponiblesPanel`, `DashboardOperador`; hook `useDashboard` con 4 queries TanStack Query (staleTime 60s). Ruta `/dashboard` conectada al componente real (era PlaceholderPage).
+- **Ronda 1 — RECHAZADO**: R26 sin test (el impl report citaba el archivo fuente, no un test).
+- **Ronda 2 — RECHAZADO**: Test R26 agregado con mock de recharts (jsdom colapsa ResponsiveContainer a 0×0), pero el mock usaba `require('react')` violando `@typescript-eslint/no-require-imports` y `no-useless-assignment`.
+- **Ronda 3 — APROBADO**: Se reemplazó `React.ReactNode` por `import('react').ReactNode` inline. Lint limpio, 30/30 init.sh.
+- Tests: backend 256/256 ✅ | frontend 137/137 ✅ | lint ✅ ambos | build ✅ ambos.
+
+**Próxima feature:** `vista_repartidor` (id: 15, sprint 5, sdd: true) → lanzar `spec_author`.
+
+---

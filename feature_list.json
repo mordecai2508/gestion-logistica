@@ -252,7 +252,7 @@
         "Tests: endpoint metrics, endpoint envíos-recientes, renderizado de tarjetas y gráfico"
       ],
       "sdd": true,
-      "status": "in_progress"
+      "status": "done"
     },
     {
       "id": 15,
