@@ -307,7 +307,7 @@
         "Tests: listar, filtrar por disponibilidad, detalle, actualizar, 403 con rol incorrecto"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "done"
     },
     {
       "id": 18,

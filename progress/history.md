@@ -356,3 +356,29 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `gestion_repartidores` (id: 17, sprint 5, sdd: true).
 
 ---
+
+## Sesión 2026-06-09 — gestion_repartidores (id 17)
+
+**Feature:** Gestión de repartidores
+**Estado final:** `done`
+**Commits:** `fdc5155 feat(gestion_repartidores)` + cierre
+
+### Resumen
+- 3 endpoints OPERADOR: GET /repartidores (paginado+filtro disponible), GET /repartidores/:id, PATCH /repartidores/:id (actualiza disponible y/o licencia).
+- Router `repartidores.ts` (plural) creado sin colisionar con `repartidor.ts` (singular, rol REPARTIDOR).
+- 4 componentes frontend: GestionRepartidores, RepartidorTable, RepartidorDetalle, EditarRepartidor.
+- Sidebar de operador actualizado con enlace "Repartidores".
+- 15 tests backend (R1–R15) + 10 tests frontend (R16–R23). Reviewer aprobó en 1 pass.
+
+### Archivos clave
+- `backend/src/repositories/repartidorRepository.ts` (nuevo)
+- `backend/src/services/repartidorService.ts` (nuevo)
+- `backend/src/tests/repartidores.test.ts` (nuevo, 15 tests)
+- `frontend/src/features/repartidores/` (4 componentes nuevos)
+- `frontend/src/components/shared/OperadorSidebar.tsx` (modificado)
+
+- `./init.sh` ✅.
+
+**Próxima feature:** `reportes` (id: 18, sprint 5, sdd: true).
+
+---
