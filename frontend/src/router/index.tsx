@@ -22,6 +22,7 @@ import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { DashboardOperador } from '@/features/dashboard/DashboardOperador';
 import { MisEnvios } from '@/features/cliente/MisEnvios';
 import { GestionRepartidores } from '@/features/repartidores/GestionRepartidores';
+import { ReportesPage } from '@/features/reportes/ReportesPage';
 
 export function AppRouter() {
   return (
@@ -55,7 +56,7 @@ export function AppRouter() {
             <Route path="/rutas/:id" element={<RutaDetalle />} />
             <Route path="/vehiculos" element={<GestionVehiculos />} />
             <Route path="/incidencias" element={<GestionIncidencias />} />
-            <Route path="/reportes" element={<PlaceholderPage title="Reportes" />} />
+            <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/repartidores" element={<GestionRepartidores />} />
             <Route path="/usuarios" element={<PlaceholderPage title="Usuarios" />} />
             <Route path="/perfil" element={<Perfil />} />

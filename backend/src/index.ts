@@ -25,6 +25,7 @@ import { notificacionesRouter } from './routes/notificaciones';
 import { dashboardRouter } from './routes/dashboard';
 import { repartidorRouter } from './routes/repartidor';
 import { repartidoresRouter } from './routes/repartidores';
+import { reportesRouter } from './routes/reportes';
 import { setIo } from './lib/socketServer';
 
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/v1/notificaciones', notificacionesRouter);
 app.use('/api/v1/dashboard', dashboardRouter);
 app.use('/api/v1/repartidor', repartidorRouter);
 app.use('/api/v1/repartidores', repartidoresRouter);
+app.use('/api/v1/reportes', reportesRouter);
 
 app.use(errorHandler);
 
