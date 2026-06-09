@@ -382,3 +382,29 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `reportes` (id: 18, sprint 5, sdd: true).
 
 ---
+
+## Sesión 2026-06-09 — reportes (id 18)
+
+**Feature:** Reportes y estadísticas
+**Estado final:** `done`
+**Commits:** `4504344 feat(reportes)` + cierre
+
+### Resumen
+- 3 endpoints OPERADOR: GET /reportes/envios (porEstado + porDia), GET /reportes/envios/export (CSV), GET /reportes/repartidores (ranking).
+- Agrupación porDia en JS (Prisma groupBy no soporta DATE_TRUNC directamente).
+- CSV generado en servidor con columnas: codigoSeguimiento, estado, remitente, destinatario, direccionDestino, createdAt.
+- Ranking de repartidores via Repartidor → Ruta → Envio (sin FK directa Envio.repartidorId).
+- 5 componentes frontend: ReportesPage, EnviosPorDiaChart (recharts BarChart), EstadoBreakdownTable, RepartidorRankingTable, DateRangePicker.
+- 11 tests integración + 4 tests unitarios de servicio (backend) + 4 tests frontend. Reviewer aprobó en 1 pass.
+
+### Archivos clave
+- `backend/src/services/reportesService.ts` (nuevo — lógica de agrupación porDia + generación CSV)
+- `backend/src/tests/reportes.test.ts` (nuevo, 11 tests)
+- `backend/src/tests/reportesService.test.ts` (nuevo, 4 tests unitarios)
+- `frontend/src/features/reportes/ReportesPage.tsx` (nuevo)
+
+- `./init.sh` ✅.
+
+**Backlog completado. Todas las features del sprint 5 finalizadas.**
+
+---

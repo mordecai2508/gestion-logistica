@@ -8,19 +8,19 @@
 
 ## Estado
 
-`gestion_repartidores` (id 17) cerrada. Iniciando `reportes`.
+Todas las features del backlog completadas. Sprint 5 finalizado.
 
 ## Feature en progreso
 
-`reportes` (id: 18, sprint 5, `sdd: true`, status: `pending`)
+Ninguna — backlog agotado.
 
 ## Última acción
 
-Cerrado `gestion_repartidores` con commit `fdc5155`. Feature marcada `done`.
+`reportes` (id 18) cerrado con commit `4504344`. Feature marcada `done`.
 
 ## Próximo paso
 
-Lanzar `spec_author` para `reportes` (HU52–HU54).
+Sin features pendientes en `feature_list.json`. Proyecto completado.
 
 ## Bloqueos
 

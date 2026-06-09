@@ -326,7 +326,7 @@
         "Tests: endpoint envios con rango de fechas, endpoint repartidores, generación de CSV, 403 con rol incorrecto"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "done"
     },
     {
       "id": 12,
