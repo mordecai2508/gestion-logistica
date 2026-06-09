@@ -8,18 +8,20 @@
 
 ## Estado
 
-
+`mis_envios_cliente` (id 16) cerrada. Iniciando `gestion_repartidores`.
 
 ## Feature en progreso
 
-
+`gestion_repartidores` (id: 17, sprint 5, `sdd: true`, status: `pending`)
 
 ## Última acción
 
-
+Cerrado `mis_envios_cliente` con commit `daa067b`. Feature marcada `done`.
 
 ## Próximo paso
 
-
+Lanzar `spec_author` para `gestion_repartidores` (HU49–HU51).
 
 ## Bloqueos
+
+Ninguno.

@@ -289,7 +289,7 @@
         "Tests: endpoint GET /clientes/me/envios con auth CLIENTE, filtro por estado, 401 sin token, 403 con token OPERADOR"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "done"
     },
     {
       "id": 17,

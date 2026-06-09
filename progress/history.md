@@ -331,3 +331,28 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `mis_envios_cliente` (id: 16, sprint 5, sdd: true) → lanzar `spec_author`.
 
 ---
+## Sesión 2026-06-09 — mis_envios_cliente (id 16)
+
+**Feature:** Mis envíos (vista cliente)
+**Estado final:** `done`
+**Commits:** `daa067b feat(mis_envios_cliente)` + cierre
+
+### Resumen
+- Endpoint nuevo `GET /api/v1/clientes/me/envios` con auth CLIENTE, paginación (?page, ?limit=10), filtro ?estado.
+- Resolución clienteId desde JWT vía `clienteRepository.findByUsuarioId`.
+- `MisEnvios.tsx`: tabla con badge de color por estado, botón "Rastrear" → /tracking/:codigo, selector de filtro, paginación, loading/error/empty states.
+- 7 tests backend (R1–R7) + 8 tests frontend (R8–R15).
+- 2 passes de review: primer pass rechazó por tests frontend ausentes + ruta tracking; segundo pass aprobó.
+
+### Archivos clave
+- `backend/src/validators/clienteValidator.ts` (nuevo)
+- `backend/src/tests/misEnviosCliente.test.ts` (nuevo, 7 tests)
+- `frontend/src/features/cliente/MisEnvios.tsx` (nuevo)
+- `frontend/src/features/cliente/__tests__/MisEnvios.test.tsx` (nuevo, 8 tests)
+- `frontend/src/hooks/useMisEnvios.ts` (nuevo)
+
+- Tests: backend 268/268 ✅ | frontend 152/152 ✅ | `./init.sh` ✅.
+
+**Próxima feature:** `gestion_repartidores` (id: 17, sprint 5, sdd: true).
+
+---
