@@ -22,6 +22,7 @@ import { vehiculosRouter } from './routes/vehiculos';
 import { entregasRouter } from './routes/entregas';
 import { incidenciasRouter } from './routes/incidencias';
 import { notificacionesRouter } from './routes/notificaciones';
+import { dashboardRouter } from './routes/dashboard';
 import { setIo } from './lib/socketServer';
 
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api/v1/vehiculos', vehiculosRouter);
 app.use('/api/v1/entregas', entregasRouter);
 app.use('/api/v1/incidencias', incidenciasRouter);
 app.use('/api/v1/notificaciones', notificacionesRouter);
+app.use('/api/v1/dashboard', dashboardRouter);
 
 app.use(errorHandler);
 

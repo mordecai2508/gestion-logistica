@@ -19,8 +19,7 @@ import { Notificaciones } from '@/features/notificaciones/Notificaciones';
 import { OperadorLayout } from '@/components/shared/OperadorLayout';
 import { RepartidorLayout } from '@/components/shared/RepartidorLayout';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
-
-const DashboardPage = () => <div>Dashboard</div>;
+import { DashboardOperador } from '@/features/dashboard/DashboardOperador';
 const MisEnviosPage = () => <div>Mis Envios</div>;
 
 export function AppRouter() {
@@ -44,7 +43,7 @@ export function AppRouter() {
         {/* Protected routes — OPERADOR (con OperadorLayout) */}
         <Route element={<ProtectedRoute allowedRoles={['OPERADOR']} />}>
           <Route element={<OperadorLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardOperador />} />
             {/* /envios/crear must come before /envios/:id to avoid param collision */}
             <Route path="/envios/crear" element={<CrearEnvio />} />
             <Route path="/envios" element={<ConsultarEnvios />} />
