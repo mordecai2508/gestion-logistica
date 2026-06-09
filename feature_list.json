@@ -271,7 +271,7 @@
         "Tests: listar entregas pendientes y completadas, renderizado de tarjetas, navegación a detalle"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "id": 16,

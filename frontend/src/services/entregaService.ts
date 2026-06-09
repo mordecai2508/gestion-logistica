@@ -13,9 +13,7 @@ interface ApiResponse<T> {
 
 export const entregaService = {
   async listarMisEntregas(): Promise<EntregasAgrupadasDto> {
-    const res = await api.get<ApiResponse<EntregasAgrupadasDto>>('/entregas', {
-      params: { repartidorId: 'me' },
-    });
+    const res = await api.get<ApiResponse<EntregasAgrupadasDto>>('/repartidor/entregas');
     return res.data.data;
   },
 

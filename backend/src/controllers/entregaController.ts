@@ -24,6 +24,23 @@ export const listarMisEntregas = async (
   }
 };
 
+export const listarMisEntregasRepartidor = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const data = await entregaService.listarMisEntregas(req.user!.id);
+    res.status(200).json({
+      data,
+      message: 'Entregas obtenidas',
+      status: 200,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const confirmarEntrega = async (
   req: Request<{ id: string }>,
   res: Response,

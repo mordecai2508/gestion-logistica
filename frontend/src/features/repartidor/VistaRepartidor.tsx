@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Package } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useEntregas } from '@/hooks/useEntregas';
 import { ReportarIncidencia } from './ReportarIncidencia';
@@ -35,10 +37,12 @@ function EntregaCard({ entrega, navegable, onReportarIncidencia }: EntregaCardPr
   return (
     <Card>
       <CardContent className="flex items-center justify-between gap-3 p-4">
-        <div className="min-w-0 space-y-1">
+        <Package className="shrink-0 text-gray-400" aria-hidden="true" />
+        <div className="min-w-0 flex-1 space-y-1">
           <p className="font-mono text-sm font-semibold text-gray-900">
             {entrega.codigoSeguimiento}
           </p>
+          <Badge variant="secondary">{entrega.estado}</Badge>
           <p className="truncate text-sm text-gray-700">{entrega.direccionDestino}</p>
           <p className="text-xs text-gray-500">{formatRangoHorario(entrega.updatedAt)}</p>
           {onReportarIncidencia && (
@@ -99,7 +103,7 @@ export function VistaRepartidor() {
 
           <TabsContent value="pendientes" className="space-y-3">
             {pendientes.length === 0 ? (
-              <p className="text-sm text-gray-500">No tienes entregas pendientes.</p>
+              <p className="text-sm text-gray-500">No tienes entregas pendientes hoy</p>
             ) : (
               pendientes.map((entrega) => (
                 <EntregaCard

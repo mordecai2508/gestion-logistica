@@ -103,3 +103,70 @@ describe('R32 — VistaRepartidor: navegación a la pantalla de confirmación', 
     expect(mockNavigate).toHaveBeenCalledWith('/repartidor/entregas/envio-1/confirmar');
   });
 });
+
+describe('vista_repartidor — VistaRepartidor R7–R13', () => {
+  it('R7 - debe renderizar título "Mis Entregas" y pestañas Pendientes y Completadas', () => {
+    renderWithProviders();
+
+    expect(screen.getByRole('heading', { name: 'Mis Entregas' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Pendientes \(1\)/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Completadas/i })).toBeInTheDocument();
+  });
+
+  it('R8 - debe renderizar una tarjeta por entrega pendiente con icono de paquete, codigoSeguimiento, direccionDestino y estado', () => {
+    renderWithProviders();
+
+    expect(screen.getByText('TRK-20260607-AAAA1111')).toBeInTheDocument();
+    expect(screen.getByText('Calle 123')).toBeInTheDocument();
+    expect(screen.getByText('EN_RUTA')).toBeInTheDocument();
+  });
+
+  it('R9 - debe renderizar una tarjeta por entrega completada sin flecha de navegación', () => {
+    renderWithProviders();
+
+    fireEvent.click(screen.getByRole('tab', { name: /Completadas/i }));
+
+    expect(screen.getByText('TRK-20260607-BBBB2222')).toBeInTheDocument();
+    expect(screen.getByText('ENTREGADO')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Confirmar entrega TRK-20260607-BBBB2222/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('R10 - debe mostrar "No tienes entregas pendientes hoy" cuando la lista de pendientes está vacía', () => {
+    mockUseEntregasReturn = {
+      data: { pendientes: [], completadas: [] },
+      isLoading: false,
+      isError: false,
+    };
+    renderWithProviders();
+
+    expect(screen.getByText('No tienes entregas pendientes hoy')).toBeInTheDocument();
+  });
+
+  it('R11 - debe navegar a /repartidor/entregas/:id/confirmar al hacer clic en una tarjeta pendiente', () => {
+    renderWithProviders();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Confirmar entrega TRK-20260607-AAAA1111/i }),
+    );
+
+    expect(mockNavigate).toHaveBeenCalledWith('/repartidor/entregas/envio-1/confirmar');
+  });
+
+  it('R12 - debe mostrar indicador de carga mientras la API responde', () => {
+    mockUseEntregasReturn = { data: undefined, isLoading: true, isError: false };
+    renderWithProviders();
+
+    expect(screen.getByText('Cargando entregas...')).toBeInTheDocument();
+  });
+
+  it('R13 - debe mostrar mensaje de error con role="alert" cuando la API falla', () => {
+    mockUseEntregasReturn = { data: undefined, isLoading: false, isError: true };
+    renderWithProviders();
+
+    const alertEl = screen.getByRole('alert');
+    expect(alertEl).toBeInTheDocument();
+    expect(alertEl).toHaveTextContent(/No fue posible cargar/i);
+  });
+});
