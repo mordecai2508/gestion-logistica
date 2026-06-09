@@ -5,19 +5,8 @@ import { RutaCard } from './RutaCard';
 import { RutaForm } from './RutaForm';
 import { useRutas } from '@/hooks/useRutas';
 import { useEnvios } from '@/hooks/useEnvios';
-import type { VehiculoDto, RepartidorDto } from '@/types/rutaTypes';
-
-// NOTA DE ALCANCE (ver progress/impl_rutas_gestion.md, sección "Correcciones
-// aplicadas tras revisión"): no existe todavía un endpoint `/api/v1/vehiculos`
-// ni uno de repartidores disponibles — `vehiculos_gestion` (id 8) sigue
-// `pending` en feature_list.json. `RutaForm` recibe arreglos vacíos para esos
-// dos selectores (en vez de datos de muestra que ocultarían el problema): el
-// formulario es honesto sobre su estado — el operador puede ver y completar
-// la lista de envíos disponibles (datos reales vía useEnvios) y la lista de
-// rutas reales, pero los selectores de vehículo/repartidor quedarán
-// operativos cuando `vehiculos_gestion` exponga sus endpoints.
-const vehiculosDisponibles: VehiculoDto[] = [];
-const repartidoresDisponibles: RepartidorDto[] = [];
+import { useVehiculos } from '@/hooks/useVehiculos';
+import { useRepartidores } from '@/hooks/useRepartidores';
 
 export function GestionRutas() {
   const navigate = useNavigate();
@@ -25,9 +14,13 @@ export function GestionRutas() {
 
   const { data, isLoading, isError } = useRutas({ page: 1, limit: 20 });
   const { data: enviosPendientes } = useEnvios({ page: 1, limit: 100, estado: 'PENDIENTE' });
+  const { data: vehiculosData } = useVehiculos();
+  const { data: repartidoresData } = useRepartidores();
 
   const rutas = data?.data ?? [];
   const enviosDisponibles = enviosPendientes?.data ?? [];
+  const vehiculosDisponibles = vehiculosData ?? [];
+  const repartidoresDisponibles = repartidoresData?.data ?? [];
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">

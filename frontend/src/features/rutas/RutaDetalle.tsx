@@ -6,17 +6,8 @@ import { Select } from '@/components/ui/select';
 import { Toast } from '@/components/ui/toast';
 import { useRutaDetalle } from '@/hooks/useRutaDetalle';
 import { useReasignarRuta } from '@/hooks/useReasignarRuta';
-import type { VehiculoDto, RepartidorDto } from '@/types/rutaTypes';
-
-// NOTA DE ALCANCE (ver progress/impl_rutas_gestion.md, sección "Correcciones
-// aplicadas tras revisión"): igual que en GestionRutas, los selectores de
-// "Nuevo vehículo" / "Nuevo repartidor" no tienen un endpoint de
-// disponibilidad propio todavía (`vehiculos_gestion`, id 8, sigue `pending`).
-// Se mantienen como arreglos vacíos reales — sin datos de muestra que oculten
-// la limitación — hasta que esa feature exponga `/api/v1/vehiculos` y un
-// listado de repartidores disponibles.
-const vehiculosDisponibles: VehiculoDto[] = [];
-const repartidoresDisponibles: RepartidorDto[] = [];
+import { useVehiculos } from '@/hooks/useVehiculos';
+import { useRepartidores } from '@/hooks/useRepartidores';
 
 export function RutaDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +15,11 @@ export function RutaDetalle() {
 
   const { data: ruta, isLoading, isError } = useRutaDetalle(rutaId);
   const reasignar = useReasignarRuta(rutaId);
+  const { data: vehiculosData } = useVehiculos();
+  const { data: repartidoresData } = useRepartidores();
+
+  const vehiculosDisponibles = vehiculosData ?? [];
+  const repartidoresDisponibles = repartidoresData?.data ?? [];
 
   const [nuevoVehiculoId, setNuevoVehiculoId] = useState('');
   const [nuevoRepartidorId, setNuevoRepartidorId] = useState('');

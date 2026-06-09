@@ -39,6 +39,24 @@ vi.mock('@/hooks/useEnvios', () => ({
   }),
 }));
 
+vi.mock('@/hooks/useVehiculos', () => ({
+  useVehiculos: () => ({
+    data: [
+      { id: 'v1', placa: 'ABC-123', modelo: 'Camión', capacidad: 1000, estado: 'DISPONIBLE' },
+    ],
+  }),
+}));
+
+vi.mock('@/hooks/useRepartidores', () => ({
+  useRepartidores: () => ({
+    data: {
+      data: [
+        { id: 'r1', usuario: { nombre: 'Juan', correo: 'j@test.com' }, licencia: null, disponible: true },
+      ],
+    },
+  }),
+}));
+
 vi.mock('@/hooks/useCrearRuta', () => ({
   useCrearRuta: () => ({
     mutateAsync: mockCrearMutateAsync,
@@ -118,16 +136,16 @@ describe('R24 — GestionRutas: debe renderizar el formulario con todos los cont
     expect(screen.getByLabelText(/seleccionar envío TRK-20260605-AAAA1111/i)).toBeInTheDocument();
   });
 
-  it('documenta honestamente que los selectores de vehículo y repartidor quedan vacíos hasta que exista el endpoint de vehiculos_gestion (id 8)', () => {
+  it('los selectores de vehículo y repartidor se alimentan de los hooks reales (vehiculos_gestion y repartidores_gestion ya implementados)', () => {
     renderWithProviders(<GestionRutas />);
     fireEvent.click(screen.getByRole('button', { name: /nueva ruta/i }));
 
     const vehiculoSelect = screen.getByLabelText(/seleccionar vehículo/i);
     const repartidorSelect = screen.getByLabelText(/seleccionar repartidor/i);
 
-    // Sin datos de muestra que oculten la limitación: solo la opción placeholder.
-    expect(vehiculoSelect.querySelectorAll('option')).toHaveLength(1);
-    expect(repartidorSelect.querySelectorAll('option')).toHaveLength(1);
+    // Placeholder + 1 opción real por cada selector (datos del mock de useVehiculos/useRepartidores).
+    expect(vehiculoSelect.querySelectorAll('option')).toHaveLength(2);
+    expect(repartidorSelect.querySelectorAll('option')).toHaveLength(2);
   });
 });
 
