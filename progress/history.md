@@ -281,3 +281,21 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `layout_navegacion` (id: 13, sprint 5, sdd: true) → lanzar `spec_author`.
 
 ---
+
+## Sesión 2026-06-08 — layout_navegacion ✅ DONE
+
+**Feature:** `layout_navegacion` (id: 13, sprint 5, sdd: true)
+**Resultado:** APROBADO por reviewer en primera pasada. Commit `7c58313`.
+
+**Resumen:**
+- `spec_author` redactó R1–R24 / T1–T16. Feature 100% frontend, sin endpoints nuevos.
+- Decisiones confirmadas por el humano: (A) Layout Route de React Router v6 como estrategia de layout automático; (B) buscador global como placeholder visual; (C) `/usuarios` con PlaceholderPage; (D) badge con `useUnreadCount` en cliente sin endpoint dedicado; (E) refactorización de `VistaRepartidor` aprobada. Además: `/perfil` y `/notificaciones` dentro del layout de OPERADOR y REPARTIDOR; barra repartidor "Rutas" → PlaceholderPage.
+- Componentes creados: `OperadorSidebar`, `OperadorTopbar`, `OperadorLayout`, `RepartidorBottomNav`, `RepartidorLayout`, `NotificationBell`, `ProfileMenu`, `PlaceholderPage`, `useUnreadCount`. Todos en `frontend/src/components/shared/` y `frontend/src/hooks/`.
+- `frontend/src/router/index.tsx` reestructurado con grupos de Layout Route por rol (OPERADOR con `OperadorLayout`, REPARTIDOR con `RepartidorLayout`); `/perfil` y `/notificaciones` duplicadas en ambos grupos con layout.
+- `VistaRepartidor.tsx`: eliminado header/nav inline obsoleto.
+- Fix menor en `ProfileMenu.tsx`: `try/finally` sin `catch` propagaba unhandled rejection en logout con error de red; se añadió `catch` vacío para swallowing intencional (el `finally` garantiza `clearAuth + navigate` siempre).
+- Tests: 124/124 frontend ✅ (22 nuevos: `OperadorSidebar.test.tsx`, `RepartidorBottomNav.test.tsx`, `NotificationBell.test.tsx`, `ProfileMenu.test.tsx`). Lint ✅ | Build ✅ | `./init.sh` 30/30 ✅.
+
+**Próxima feature:** `dashboard_operador` (id: 14, sprint 5, sdd: true) → lanzar `spec_author`.
+
+---
