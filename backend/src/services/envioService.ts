@@ -14,8 +14,10 @@ import {
   CancelarEnvioResponseDto,
   ReprogramarEnvioDto,
   ReprogramarEnvioResponseDto,
+  MisEnviosItemDto,
 } from '../types/envioTypes';
 import type { ListarEnviosInput } from '../validators/envioValidator';
+import type { ListarMisEnviosInput } from '../validators/clienteValidator';
 import { rutaService } from './rutaService';
 
 async function generarCodigoUnico(): Promise<string> {
@@ -189,6 +191,48 @@ export const envioService = {
       id: envio.id,
       codigoSeguimiento: envio.codigoSeguimiento,
       estado: envio.estado,
+    };
+  },
+
+  async listarMisEnvios(
+    usuarioId: string,
+    query: ListarMisEnviosInput,
+  ): Promise<{ data: MisEnviosItemDto[]; meta: { total: number; page: number; limit: number; totalPages: number } }> {
+    const cliente = await clienteRepository.findByUsuarioId(usuarioId);
+    if (cliente === null) {
+      throw new AppError(
+        'CLIENTE_NOT_FOUND',
+        'No existe perfil de cliente para este usuario',
+        404,
+      );
+    }
+
+    const { page, limit, estado } = query;
+    const skip = (page - 1) * limit;
+
+    const { envios, total } = await envioRepository.findManyByClienteId({
+      clienteId: cliente.id,
+      estado,
+      skip,
+      take: limit,
+    });
+
+    const data: MisEnviosItemDto[] = envios.map((e) => ({
+      id: e.id,
+      codigoSeguimiento: e.codigoSeguimiento,
+      estado: e.estado,
+      destinatario: e.destinatario,
+      createdAt: e.createdAt.toISOString(),
+    }));
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   },
 

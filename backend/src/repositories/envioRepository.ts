@@ -1,4 +1,4 @@
-import { PrismaClient, Envio, Prisma } from '@prisma/client';
+import { PrismaClient, Envio, Prisma, EstadoEnvio } from '@prisma/client';
 import { CrearEnvioDto, EditarEnvioDto } from '../types/envioTypes';
 
 const prisma = new PrismaClient();
@@ -98,6 +98,28 @@ export const envioRepository = {
    * datos (mismo patrón que `entregaRepository.confirmarEntrega`/`registrarFallo`).
    * No modifica `Envio.estado`.
    */
+  async findManyByClienteId(params: {
+    clienteId: string;
+    estado?: EstadoEnvio;
+    skip: number;
+    take: number;
+  }): Promise<{ envios: Envio[]; total: number }> {
+    const where: Prisma.EnvioWhereInput = { clienteId: params.clienteId };
+    if (params.estado !== undefined) {
+      where.estado = params.estado;
+    }
+    const [envios, total] = await Promise.all([
+      prisma.envio.findMany({
+        where,
+        skip: params.skip,
+        take: params.take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.envio.count({ where }),
+    ]);
+    return { envios, total };
+  },
+
   async reprogramar(
     id: string,
     data: { fechaReprogramacion: Date; descripcionEvento: string },

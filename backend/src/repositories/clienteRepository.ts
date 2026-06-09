@@ -7,6 +7,10 @@ export const clienteRepository = {
     return prisma.cliente.findUnique({ where: { id } });
   },
 
+  async findByUsuarioId(usuarioId: string): Promise<Cliente | null> {
+    return prisma.cliente.findUnique({ where: { usuarioId } });
+  },
+
   async search(query: string): Promise<Array<{ id: string; usuario: { nombre: string; correo: string } }>> {
     return prisma.cliente.findMany({
       where: {

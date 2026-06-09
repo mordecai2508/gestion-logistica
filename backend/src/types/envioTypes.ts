@@ -1,3 +1,5 @@
+import { EstadoEnvio } from '@prisma/client';
+
 export interface CrearEnvioDto {
   remitente: string;
   destinatario: string;
@@ -95,4 +97,19 @@ export interface ReprogramarEnvioResponseDto {
   codigoSeguimiento: string;
   estado: string;
   fechaReprogramacion: string;
+}
+
+export interface MisEnviosItemDto {
+  id: string;
+  codigoSeguimiento: string;
+  estado: EstadoEnvio;
+  destinatario: string;
+  createdAt: string;
+}
+
+export interface PaginatedMisEnviosResponse {
+  data: MisEnviosItemDto[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+  message: string;
+  status: 200;
 }

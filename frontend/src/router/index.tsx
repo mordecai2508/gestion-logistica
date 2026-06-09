@@ -20,7 +20,7 @@ import { OperadorLayout } from '@/components/shared/OperadorLayout';
 import { RepartidorLayout } from '@/components/shared/RepartidorLayout';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { DashboardOperador } from '@/features/dashboard/DashboardOperador';
-const MisEnviosPage = () => <div>Mis Envios</div>;
+import { MisEnvios } from '@/features/cliente/MisEnvios';
 
 export function AppRouter() {
   return (
@@ -32,10 +32,11 @@ export function AppRouter() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/tracking" element={<RastrearPaquete />} />
+        <Route path="/tracking/:codigo" element={<RastrearPaquete />} />
 
         {/* Protected routes — CLIENTE (sin layout de rol) */}
         <Route element={<ProtectedRoute allowedRoles={['CLIENTE']} />}>
-          <Route path="/mis-envios" element={<MisEnviosPage />} />
+          <Route path="/mis-envios" element={<MisEnvios />} />
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/notificaciones" element={<Notificaciones />} />
         </Route>
