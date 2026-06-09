@@ -317,3 +317,17 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `vista_repartidor` (id: 15, sprint 5, sdd: true) → lanzar `spec_author`.
 
 ---
+
+## Sesión 2026-06-09 — vista_repartidor ✅ DONE
+
+**Feature:** `vista_repartidor` (id: 15, sprint 5, sdd: true)
+**Resultado:** APROBADO por reviewer en primera pasada. Commit `d4c6ad9`.
+
+**Resumen:**
+- La mayor parte del código ya existía de `entregas_confirmacion` y `layout_navegacion`. Trabajo nuevo: (1) ruta alias `GET /api/v1/repartidor/entregas` en `backend/src/routes/repartidor.ts` que delega en `listarMisEntregasRepartidor` (alias de `listarMisEntregas` sin query validation para `repartidorId`); (2) 3 ajustes en `VistaRepartidor.tsx` — icono `<Package />`, badge de estado en tarjeta, mensaje vacío corregido a "hoy"; (3) URL del servicio frontend actualizada de `/entregas` a `/repartidor/entregas`; (4) `VistaRepartidor.test.tsx` nuevo con 7 tests R7–R13; (5) `badge.tsx` Shadcn añadido para mostrar el estado.
+- Endpoint original `/api/v1/entregas?repartidorId=me` intacto y sus tests pasan sin cambios.
+- Tests: backend 261/261 ✅ | frontend 144/144 ✅ | lint ✅ ambos | build ✅ ambos | `./init.sh` 30/30 ✅.
+
+**Próxima feature:** `mis_envios_cliente` (id: 16, sprint 5, sdd: true) → lanzar `spec_author`.
+
+---
