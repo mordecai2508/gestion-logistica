@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   FileBarChart,
   Users,
+  UserCheck,
   X,
 } from 'lucide-react';
 
@@ -22,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Envíos', path: '/envios', icon: <Package className="h-4 w-4" /> },
   { label: 'Rutas', path: '/rutas', icon: <Route className="h-4 w-4" /> },
   { label: 'Vehículos', path: '/vehiculos', icon: <Truck className="h-4 w-4" /> },
+  { label: 'Repartidores', path: '/repartidores', icon: <UserCheck className="h-4 w-4" /> },
   { label: 'Incidencias', path: '/incidencias', icon: <AlertTriangle className="h-4 w-4" /> },
   { label: 'Reportes', path: '/reportes', icon: <FileBarChart className="h-4 w-4" /> },
   { label: 'Usuarios', path: '/usuarios', icon: <Users className="h-4 w-4" /> },

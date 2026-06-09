@@ -21,6 +21,7 @@ import { RepartidorLayout } from '@/components/shared/RepartidorLayout';
 import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 import { DashboardOperador } from '@/features/dashboard/DashboardOperador';
 import { MisEnvios } from '@/features/cliente/MisEnvios';
+import { GestionRepartidores } from '@/features/repartidores/GestionRepartidores';
 
 export function AppRouter() {
   return (
@@ -55,6 +56,7 @@ export function AppRouter() {
             <Route path="/vehiculos" element={<GestionVehiculos />} />
             <Route path="/incidencias" element={<GestionIncidencias />} />
             <Route path="/reportes" element={<PlaceholderPage title="Reportes" />} />
+            <Route path="/repartidores" element={<GestionRepartidores />} />
             <Route path="/usuarios" element={<PlaceholderPage title="Usuarios" />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/notificaciones" element={<Notificaciones />} />
