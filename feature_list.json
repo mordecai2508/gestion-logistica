@@ -232,7 +232,7 @@
         "Tests: renderizado del sidebar con enlace activo correcto, renderizado de barra repartidor, colapso mobile"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "in_progress"
     },
     {
       "id": 14,

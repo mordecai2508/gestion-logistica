@@ -16,9 +16,11 @@ import { GestionIncidencias } from '@/features/incidencias/GestionIncidencias';
 import { VistaRepartidor } from '@/features/repartidor/VistaRepartidor';
 import { ConfirmacionEntrega } from '@/features/repartidor/ConfirmacionEntrega';
 import { Notificaciones } from '@/features/notificaciones/Notificaciones';
+import { OperadorLayout } from '@/components/shared/OperadorLayout';
+import { RepartidorLayout } from '@/components/shared/RepartidorLayout';
+import { PlaceholderPage } from '@/components/shared/PlaceholderPage';
 
 const DashboardPage = () => <div>Dashboard</div>;
-const RepartidorPage = () => <div>Repartidor</div>;
 const MisEnviosPage = () => <div>Mis Envios</div>;
 
 export function AppRouter() {
@@ -32,47 +34,47 @@ export function AppRouter() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/tracking" element={<RastrearPaquete />} />
 
-        {/* Protected routes — all authenticated roles */}
-        <Route
-          element={
-            <ProtectedRoute allowedRoles={['CLIENTE', 'OPERADOR', 'REPARTIDOR']} />
-          }
-        >
+        {/* Protected routes — CLIENTE (sin layout de rol) */}
+        <Route element={<ProtectedRoute allowedRoles={['CLIENTE']} />}>
+          <Route path="/mis-envios" element={<MisEnviosPage />} />
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/notificaciones" element={<Notificaciones />} />
         </Route>
 
-        {/* Protected routes — OPERADOR */}
+        {/* Protected routes — OPERADOR (con OperadorLayout) */}
         <Route element={<ProtectedRoute allowedRoles={['OPERADOR']} />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          {/* /envios/crear must come before /envios/:id to avoid param collision */}
-          <Route path="/envios/crear" element={<CrearEnvio />} />
-          <Route path="/envios" element={<ConsultarEnvios />} />
-          <Route path="/envios/:id" element={<DetalleEnvio />} />
-          {/* Gestión de rutas — /rutas must come before /rutas/:id */}
-          <Route path="/rutas" element={<GestionRutas />} />
-          <Route path="/rutas/:id" element={<RutaDetalle />} />
-          {/* Gestión de vehículos (id 8) — el enlace "Vehículos" del sidebar
-              de layout_navegacion (aún pending) deberá apuntar a esta ruta. */}
-          <Route path="/vehiculos" element={<GestionVehiculos />} />
-          {/* Gestión de incidencias (id 10) */}
-          <Route path="/incidencias" element={<GestionIncidencias />} />
+          <Route element={<OperadorLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            {/* /envios/crear must come before /envios/:id to avoid param collision */}
+            <Route path="/envios/crear" element={<CrearEnvio />} />
+            <Route path="/envios" element={<ConsultarEnvios />} />
+            <Route path="/envios/:id" element={<DetalleEnvio />} />
+            {/* Gestión de rutas — /rutas must come before /rutas/:id */}
+            <Route path="/rutas" element={<GestionRutas />} />
+            <Route path="/rutas/:id" element={<RutaDetalle />} />
+            <Route path="/vehiculos" element={<GestionVehiculos />} />
+            <Route path="/incidencias" element={<GestionIncidencias />} />
+            <Route path="/reportes" element={<PlaceholderPage title="Reportes" />} />
+            <Route path="/usuarios" element={<PlaceholderPage title="Usuarios" />} />
+            <Route path="/perfil" element={<Perfil />} />
+            <Route path="/notificaciones" element={<Notificaciones />} />
+          </Route>
         </Route>
 
-        {/* Protected routes — REPARTIDOR */}
+        {/* Protected routes — REPARTIDOR (con RepartidorLayout) */}
         <Route element={<ProtectedRoute allowedRoles={['REPARTIDOR']} />}>
-          {/* Entregas (id 9) — rutas específicas antes del catch-all /repartidor/* */}
-          <Route path="/repartidor/entregas" element={<VistaRepartidor />} />
-          <Route
-            path="/repartidor/entregas/:id/confirmar"
-            element={<ConfirmacionEntrega />}
-          />
-          <Route path="/repartidor/*" element={<RepartidorPage />} />
-        </Route>
-
-        {/* Protected routes — CLIENTE */}
-        <Route element={<ProtectedRoute allowedRoles={['CLIENTE']} />}>
-          <Route path="/mis-envios" element={<MisEnviosPage />} />
+          <Route element={<RepartidorLayout />}>
+            <Route path="/repartidor/entregas" element={<VistaRepartidor />} />
+            <Route
+              path="/repartidor/entregas/:id/confirmar"
+              element={<ConfirmacionEntrega />}
+            />
+            <Route path="/repartidor/rutas" element={<PlaceholderPage title="Rutas" />} />
+            <Route path="/repartidor/mapa" element={<PlaceholderPage title="Mapa" />} />
+            <Route path="/repartidor/*" element={<PlaceholderPage title="Repartidor" />} />
+            <Route path="/perfil" element={<Perfil />} />
+            <Route path="/notificaciones" element={<Notificaciones />} />
+          </Route>
         </Route>
 
         {/* Default redirect */}
