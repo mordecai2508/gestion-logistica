@@ -1,0 +1,3518 @@
+openapi: 3.0.3
+info:
+  title: API de Gestión Logística y Envíos
+  version: "1.0.0"
+  description: |
+    API REST para un sistema de gestión logística y envíos. Permite a operadores
+    crear y administrar envíos, agruparlos en rutas asignadas a repartidores y
+    vehículos, y a los repartidores confirmar o reportar fallos de entrega
+    (con evidencia fotográfica y firma). Los clientes pueden consultar sus
+    propios envíos y hacer seguimiento público por código de tracking.
+
+    Incluye además gestión de incidencias (con reactivación automática de
+    entregas fallidas), notificaciones en tiempo real (vía Socket.IO, no
+    documentado en este YAML), un dashboard operativo y reportes/estadísticas
+    (incluyendo exportación CSV).
+
+    ### Convenciones generales
+
+    - **Base URL:** todas las rutas se montan bajo el prefijo `/api/v1`.
+    - **Respuesta de éxito:** `{ "data": <payload>, "message": "string", "status": 200 }`.
+    - **Respuesta de error:** `{ "error": "CODE", "message": "string", "statusCode": 422 }`.
+      Los errores de validación Zod añaden además `details: ZodIssue[]`.
+    - **Paginación:** parámetros de query `page` (default 1) y `limit` (varía por
+      endpoint). Respuesta: `{ "data": [], "meta": { "total": 0, "page": 1, "limit": 20, "totalPages": 0 } }`.
+    - **Fechas:** siempre en ISO 8601 UTC (ej. `2026-06-11T00:00:00.000Z`).
+    - **Content-Type:** `application/json` por defecto. `multipart/form-data` para
+      subida de evidencias de entrega/incidencias (máx. 5 MB por archivo, solo
+      `image/jpeg` o `image/png`). `text/csv` para la exportación de reportes.
+    - **Autenticación:** JWT Bearer (`Authorization: Bearer <accessToken>`,
+      vigencia 15 minutos). El refresh token (7 días) se gestiona vía cookie
+      httpOnly `refreshToken`.
+    - **Roles:** `CLIENTE`, `OPERADOR`, `REPARTIDOR`. Cada usuario tiene
+      exactamente un rol y un perfil asociado.
+    - **Rate limiting:** `/api/v1/auth/*` está limitado a 10 solicitudes/minuto
+      por IP.
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Desarrollo local
+tags:
+  - name: Auth
+    description: Registro, login, sesión y recuperación de contraseña
+  - name: Perfil
+    description: Perfil del usuario autenticado
+  - name: Usuarios
+    description: Gestión de usuarios del sistema (OPERADOR)
+  - name: Envios
+    description: Gestión de envíos
+  - name: Clientes
+    description: Búsqueda de clientes y autoservicio de envíos del cliente
+  - name: Tracking
+    description: Seguimiento público de envíos por código
+  - name: Rutas
+    description: Gestión de rutas de reparto
+  - name: Vehiculos
+    description: Gestión de vehículos
+  - name: Repartidores
+    description: Gestión de repartidores (vista OPERADOR)
+  - name: Entregas
+    description: Autoservicio del repartidor para confirmar/reportar entregas
+  - name: Incidencias
+    description: Gestión de incidencias sobre envíos
+  - name: Notificaciones
+    description: Notificaciones del usuario autenticado
+  - name: Dashboard
+    description: Métricas y widgets operativos
+  - name: Reportes
+    description: Reportes y estadísticas
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Rol:
+      type: string
+      enum: [CLIENTE, OPERADOR, REPARTIDOR]
+    EstadoEnvio:
+      type: string
+      enum:
+        - PENDIENTE
+        - EN_PREPARACION
+        - EN_TRANSITO
+        - EN_RUTA
+        - ENTREGADO
+        - CANCELADO
+        - FALLIDO
+    EstadoRuta:
+      type: string
+      enum:
+        - PENDIENTE
+        - EN_CURSO
+        - EN_PROGRESO
+        - COMPLETADA
+        - CANCELADA
+    EstadoVehiculo:
+      type: string
+      enum:
+        - DISPONIBLE
+        - EN_RUTA
+        - MANTENIMIENTO
+        - FUERA_SERVICIO
+    TipoNotificacion:
+      type: string
+      enum:
+        - ENVIO_CREADO
+        - CAMBIO_ESTADO
+        - ENTREGA_REALIZADA
+        - RUTA_ASIGNADA
+        - INCIDENCIA_REPORTADA
+    TipoIncidencia:
+      type: string
+      enum:
+        - ENTREGA_FALLIDA
+        - CLIENTE_AUSENTE
+        - DANIO
+        - DIRECCION_INCORRECTA
+        - OTRO
+    EstadoIncidencia:
+      type: string
+      enum: [ABIERTA, EN_PROCESO, RESUELTA]
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 42
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        totalPages:
+          type: integer
+          example: 3
+      required: [total, page, limit, totalPages]
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: NOT_FOUND
+        message:
+          type: string
+          example: Recurso no encontrado
+        statusCode:
+          type: integer
+          example: 404
+      required: [error, message, statusCode]
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+                description: ZodIssue
+          required: [details]
+
+    # ── Auth, perfil y usuarios ──────────────────────────────────────────
+    AuthUserPayload:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cklz3x9h00000a1b2c3d4e5f6
+        nombre:
+          type: string
+          example: Juan Pérez
+        correo:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        rol:
+          $ref: '#/components/schemas/Rol'
+      required: [id, nombre, correo, rol]
+    LoginResultDto:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: JWT de acceso (vigencia 15 minutos)
+        user:
+          $ref: '#/components/schemas/AuthUserPayload'
+      required: [accessToken, user]
+    RefreshResultDto:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: Nuevo JWT de acceso (vigencia 15 minutos)
+      required: [accessToken]
+    RegisterResultDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cklz3x9h00000a1b2c3d4e5f6
+        correo:
+          type: string
+          format: email
+        rol:
+          $ref: '#/components/schemas/Rol'
+      required: [id, correo, rol]
+    PerfilDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cklz3x9h00000a1b2c3d4e5f6
+        nombre:
+          type: string
+          example: Juan Pérez
+        correo:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        telefono:
+          type: string
+          nullable: true
+          example: "+50588887777"
+        rol:
+          $ref: '#/components/schemas/Rol'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, nombre, correo, telefono, rol, createdAt, updatedAt]
+    UsuarioDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cklz3x9h00000a1b2c3d4e5f6
+        nombre:
+          type: string
+          example: Juan Pérez
+        correo:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        rol:
+          $ref: '#/components/schemas/Rol'
+        telefono:
+          type: string
+          nullable: true
+          example: "+50588887777"
+        activo:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, nombre, correo, rol, telefono, activo, createdAt]
+
+    # ── Envíos, clientes, tracking ───────────────────────────────────────
+    EnvioResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+          example: cklz3x9h00010a1b2c3d4e5f7
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        remitente:
+          type: string
+          example: Almacén Central
+        destinatario:
+          type: string
+          example: María López
+        direccionDestino:
+          type: string
+          example: Av. Siempre Viva 742, Managua
+        peso:
+          type: number
+          format: float
+          example: 12.5
+        dimensiones:
+          type: string
+          example: "30x20x15"
+        descripcion:
+          type: string
+          nullable: true
+          example: Caja de electrodomésticos
+        clienteId:
+          type: string
+          example: cklz3x9h00020a1b2c3d4e5f8
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - codigoSeguimiento
+        - estado
+        - remitente
+        - destinatario
+        - direccionDestino
+        - peso
+        - dimensiones
+        - descripcion
+        - clienteId
+        - createdAt
+    EnvioListItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        remitente:
+          type: string
+        destinatario:
+          type: string
+        clienteId:
+          type: string
+        clienteNombre:
+          type: string
+          example: María López
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - codigoSeguimiento
+        - estado
+        - remitente
+        - destinatario
+        - clienteId
+        - clienteNombre
+        - createdAt
+    EventoEnvioDto:
+      type: object
+      properties:
+        id:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        descripcion:
+          type: string
+          example: Entrega reprogramada para 2026-06-15T00:00:00.000Z
+        lat:
+          type: number
+          format: float
+          nullable: true
+          example: 12.136
+        lng:
+          type: number
+          format: float
+          nullable: true
+          example: -86.251
+        timestamp:
+          type: string
+          format: date-time
+      required: [id, estado, descripcion, lat, lng, timestamp]
+    EnvioDetalleDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        remitente:
+          type: string
+        destinatario:
+          type: string
+        direccionDestino:
+          type: string
+        peso:
+          type: number
+          format: float
+        dimensiones:
+          type: string
+        descripcion:
+          type: string
+          nullable: true
+        clienteId:
+          type: string
+        rutaId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        eventos:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventoEnvioDto'
+      required:
+        - id
+        - codigoSeguimiento
+        - estado
+        - remitente
+        - destinatario
+        - direccionDestino
+        - peso
+        - dimensiones
+        - descripcion
+        - clienteId
+        - rutaId
+        - createdAt
+        - updatedAt
+        - eventos
+    CancelarEnvioResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+      required: [id, codigoSeguimiento, estado]
+    ReprogramarEnvioResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        fechaReprogramacion:
+          type: string
+          format: date-time
+      required: [id, codigoSeguimiento, estado, fechaReprogramacion]
+    MisEnviosItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        destinatario:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, codigoSeguimiento, estado, destinatario, createdAt]
+    ClienteSearchItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+        usuario:
+          type: object
+          properties:
+            nombre:
+              type: string
+              example: María López
+            correo:
+              type: string
+              format: email
+              example: maria.lopez@example.com
+          required: [nombre, correo]
+      required: [id, usuario]
+    TrackingEventoDto:
+      type: object
+      properties:
+        id:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        descripcion:
+          type: string
+        lat:
+          type: number
+          format: float
+          nullable: true
+        lng:
+          type: number
+          format: float
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+      required: [id, estado, descripcion, lat, lng, timestamp]
+    TrackingResponseDto:
+      type: object
+      properties:
+        envioId:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        remitente:
+          type: string
+        destinatario:
+          type: string
+        direccionDestino:
+          type: string
+        ultimaActualizacion:
+          type: string
+          format: date-time
+        eventos:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrackingEventoDto'
+      required:
+        - envioId
+        - codigoSeguimiento
+        - estado
+        - remitente
+        - destinatario
+        - direccionDestino
+        - ultimaActualizacion
+        - eventos
+
+    # ── Rutas, vehículos, repartidores ───────────────────────────────────
+    VehiculoResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        placa:
+          type: string
+          example: M123456
+        modelo:
+          type: string
+          example: Hyundai H100
+        capacidad:
+          type: number
+          format: float
+          example: 1500
+        estado:
+          $ref: '#/components/schemas/EstadoVehiculo'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, placa, modelo, capacidad, estado, createdAt, updatedAt]
+    VehiculoDisponibleDto:
+      type: object
+      properties:
+        id:
+          type: string
+        placa:
+          type: string
+          example: M123456
+        modelo:
+          type: string
+          example: Hyundai H100
+        estado:
+          $ref: '#/components/schemas/EstadoVehiculo'
+      required: [id, placa, modelo, estado]
+    RepartidorUsuarioDto:
+      type: object
+      properties:
+        id:
+          type: string
+        nombre:
+          type: string
+          example: Carlos Ramírez
+        correo:
+          type: string
+          format: email
+          example: carlos.ramirez@example.com
+        telefono:
+          type: string
+          nullable: true
+          example: "+50588889999"
+      required: [id, nombre, correo, telefono]
+    RepartidorDto:
+      type: object
+      properties:
+        id:
+          type: string
+        licencia:
+          type: string
+          nullable: true
+          example: B-123456
+        disponible:
+          type: boolean
+          example: true
+        usuario:
+          $ref: '#/components/schemas/RepartidorUsuarioDto'
+      required: [id, licencia, disponible, usuario]
+    RepartidorDetalleDto:
+      allOf:
+        - $ref: '#/components/schemas/RepartidorDto'
+    EnvioOrdenadoDto:
+      type: object
+      properties:
+        orden:
+          type: integer
+          example: 1
+        envioId:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        direccionDestino:
+          type: string
+        lat:
+          type: number
+          format: float
+          nullable: true
+        lng:
+          type: number
+          format: float
+          nullable: true
+      required: [orden, envioId, codigoSeguimiento, direccionDestino, lat, lng]
+    RutaOptimaResponseDto:
+      type: object
+      properties:
+        paradas:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvioOrdenadoDto'
+        advertencia:
+          type: string
+          nullable: true
+          example: null
+      required: [paradas, advertencia]
+    RutaResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigo:
+          type: string
+          example: RUT-20260611-XY98ZW76
+        estado:
+          $ref: '#/components/schemas/EstadoRuta'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        vehiculo:
+          $ref: '#/components/schemas/VehiculoResponseDto'
+        repartidor:
+          $ref: '#/components/schemas/RepartidorDto'
+        envios:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnvioListItemDto'
+      required: [id, codigo, estado, createdAt, updatedAt, vehiculo, repartidor, envios]
+    RutaPendienteDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigo:
+          type: string
+          example: RUT-20260611-XY98ZW76
+        nombre:
+          type: string
+          nullable: true
+          example: null
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, codigo, nombre, createdAt]
+
+    # ── Entregas, incidencias, notificaciones ────────────────────────────
+    EntregaListItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        destinatario:
+          type: string
+        direccionDestino:
+          type: string
+        rutaId:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, codigoSeguimiento, estado, destinatario, direccionDestino, rutaId, updatedAt]
+    EntregasAgrupadasDto:
+      type: object
+      properties:
+        pendientes:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntregaListItemDto'
+        completadas:
+          type: array
+          items:
+            $ref: '#/components/schemas/EntregaListItemDto'
+      required: [pendientes, completadas]
+    ConfirmarEntregaResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          type: string
+          enum: [ENTREGADO]
+        evidenciaFoto:
+          type: string
+          example: /uploads/entregas/cklz3x9h00010a1b2c3d4e5f7/foto.jpg
+        firma:
+          type: string
+          example: /uploads/entregas/cklz3x9h00010a1b2c3d4e5f7/firma.png
+        fechaEntrega:
+          type: string
+          format: date-time
+      required: [id, codigoSeguimiento, estado, evidenciaFoto, firma, fechaEntrega]
+    RegistrarFalloResponseDto:
+      type: object
+      properties:
+        id:
+          type: string
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        estado:
+          type: string
+          enum: [FALLIDO]
+        incidenciaId:
+          type: string
+      required: [id, codigoSeguimiento, estado, incidenciaId]
+    IncidenciaDto:
+      type: object
+      properties:
+        id:
+          type: string
+        tipo:
+          $ref: '#/components/schemas/TipoIncidencia'
+        descripcion:
+          type: string
+          example: El cliente no se encontraba en la dirección
+        estado:
+          $ref: '#/components/schemas/EstadoIncidencia'
+        foto:
+          type: string
+          nullable: true
+          example: /uploads/entregas/cklz3x9h00010a1b2c3d4e5f7/foto.jpg
+        nota:
+          type: string
+          nullable: true
+          example: Cliente ausente, se reintentará mañana
+        envioId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, tipo, descripcion, estado, foto, nota, envioId, createdAt, updatedAt]
+    IncidenciaListItemDto:
+      type: object
+      properties:
+        id:
+          type: string
+        tipo:
+          $ref: '#/components/schemas/TipoIncidencia'
+        descripcion:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoIncidencia'
+        envioId:
+          type: string
+        envioCodigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tipo, descripcion, estado, envioId, envioCodigoSeguimiento, createdAt]
+    NotificacionDto:
+      type: object
+      properties:
+        id:
+          type: string
+        tipo:
+          $ref: '#/components/schemas/TipoNotificacion'
+        mensaje:
+          type: string
+          example: Tu envío TRK-20260611-AB12CD34 ha sido creado
+        leida:
+          type: boolean
+          example: false
+        envioId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, tipo, mensaje, leida, envioId, createdAt]
+
+    # ── Dashboard y reportes ─────────────────────────────────────────────
+    DashboardMetricsDto:
+      type: object
+      properties:
+        totalEnvios:
+          type: integer
+          example: 124
+        enRuta:
+          type: integer
+          example: 18
+        entregados:
+          type: integer
+          example: 95
+        incidenciasAbiertas:
+          type: integer
+          example: 3
+      required: [totalEnvios, enRuta, entregados, incidenciasAbiertas]
+    EnvioRecienteDto:
+      type: object
+      properties:
+        codigoSeguimiento:
+          type: string
+          example: TRK-20260611-AB12CD34
+        clienteNombre:
+          type: string
+          example: María López
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        createdAt:
+          type: string
+          format: date-time
+      required: [codigoSeguimiento, clienteNombre, estado, createdAt]
+    ReporteEnviosPorEstadoDto:
+      type: object
+      properties:
+        estado:
+          $ref: '#/components/schemas/EstadoEnvio'
+        total:
+          type: integer
+          example: 32
+      required: [estado, total]
+    ReporteEnviosPorDiaDto:
+      type: object
+      properties:
+        fecha:
+          type: string
+          example: "2026-06-11"
+        total:
+          type: integer
+          example: 12
+      required: [fecha, total]
+    ReporteEnviosDto:
+      type: object
+      properties:
+        porEstado:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReporteEnviosPorEstadoDto'
+        porDia:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReporteEnviosPorDiaDto'
+        totalPeriodo:
+          type: integer
+          example: 124
+      required: [porEstado, porDia, totalPeriodo]
+    RepartidorRankingDto:
+      type: object
+      properties:
+        id:
+          type: string
+        nombre:
+          type: string
+          example: Carlos Ramírez
+        totalEntregados:
+          type: integer
+          example: 48
+        totalFallidos:
+          type: integer
+          example: 3
+      required: [id, nombre, totalEntregados, totalFallidos]
+
+    # ── Request bodies ───────────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          example: Juan Pérez
+        correo:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        password:
+          type: string
+          minLength: 8
+          format: password
+          example: SuperSecreta123
+        confirmPassword:
+          type: string
+          minLength: 1
+          format: password
+          example: SuperSecreta123
+        telefono:
+          type: string
+          minLength: 1
+          example: "+50588887777"
+        rol:
+          $ref: '#/components/schemas/Rol'
+      required: [nombre, correo, password, confirmPassword, telefono, rol]
+    LoginRequest:
+      type: object
+      properties:
+        correo:
+          type: string
+          format: email
+          example: juan.perez@example.com
+        password:
+          type: string
+          minLength: 1
+          format: password
+          example: SuperSecreta123
+      required: [correo, password]
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        correo:
+          type: string
+          format: email
+          example: juan.perez@example.com
+      required: [correo]
+    ResetPasswordRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          example: a1b2c3d4e5f6...
+        newPassword:
+          type: string
+          minLength: 8
+          format: password
+          example: NuevaSecreta456
+      required: [token, newPassword]
+    UpdateMeRequest:
+      type: object
+      description: Debe proporcionarse al menos uno de los dos campos.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          example: Juan Pérez Actualizado
+        telefono:
+          type: string
+          minLength: 1
+          example: "+50588880000"
+    ActualizarEstadoUsuarioRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        activo:
+          type: boolean
+          example: false
+      required: [activo]
+    CrearEnvioRequest:
+      type: object
+      properties:
+        remitente:
+          type: string
+          minLength: 1
+          example: Almacén Central
+        destinatario:
+          type: string
+          minLength: 1
+          example: María López
+        direccionDestino:
+          type: string
+          minLength: 1
+          example: Av. Siempre Viva 742, Managua
+        peso:
+          type: number
+          format: float
+          exclusiveMinimum: true
+          minimum: 0
+          example: 12.5
+        dimensiones:
+          type: string
+          pattern: '^\d+(\.\d+)?x\d+(\.\d+)?x\d+(\.\d+)?$'
+          example: "30x20x15"
+        clienteId:
+          type: string
+          description: cuid del cliente
+          example: cklz3x9h00020a1b2c3d4e5f8
+        descripcion:
+          type: string
+          example: Caja de electrodomésticos
+      required: [remitente, destinatario, direccionDestino, peso, dimensiones, clienteId]
+    EditarEnvioRequest:
+      type: object
+      description: Al menos un campo editable debe proporcionarse.
+      properties:
+        remitente:
+          type: string
+          minLength: 1
+          example: Almacén Central
+        destinatario:
+          type: string
+          minLength: 1
+          example: María López
+        direccionDestino:
+          type: string
+          minLength: 1
+          example: Av. Siempre Viva 742, Managua
+        peso:
+          type: number
+          format: float
+          exclusiveMinimum: true
+          minimum: 0
+          example: 12.5
+        dimensiones:
+          type: string
+          pattern: '^\d+(\.\d+)?x\d+(\.\d+)?x\d+(\.\d+)?$'
+          example: "30x20x15"
+        descripcion:
+          type: string
+          nullable: true
+          example: Caja de electrodomésticos
+    ReprogramarEnvioRequest:
+      type: object
+      properties:
+        fechaReprogramacion:
+          type: string
+          format: date-time
+          description: Fecha estrictamente futura.
+          example: "2026-06-20T00:00:00.000Z"
+      required: [fechaReprogramacion]
+    CrearRutaRequest:
+      type: object
+      properties:
+        enviosIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            description: cuid del envío
+          example: [cklz3x9h00010a1b2c3d4e5f7]
+        vehiculoId:
+          type: string
+          description: cuid del vehículo
+          example: cklz3x9h00030a1b2c3d4e5f9
+        repartidorId:
+          type: string
+          description: cuid del repartidor
+          example: cklz3x9h00040a1b2c3d4e5fa
+      required: [enviosIds, vehiculoId, repartidorId]
+    ReasignarRutaRequest:
+      type: object
+      properties:
+        repartidorId:
+          type: string
+          description: cuid del repartidor
+          example: cklz3x9h00040a1b2c3d4e5fa
+        vehiculoId:
+          type: string
+          description: cuid del vehículo
+          example: cklz3x9h00030a1b2c3d4e5f9
+    CrearVehiculoRequest:
+      type: object
+      properties:
+        placa:
+          type: string
+          example: M123456
+        modelo:
+          type: string
+          example: Hyundai H100
+        capacidad:
+          type: number
+          format: float
+          example: 1500
+      required: [placa, modelo, capacidad]
+    ActualizarEstadoVehiculoRequest:
+      type: object
+      properties:
+        estado:
+          $ref: '#/components/schemas/EstadoVehiculo'
+      required: [estado]
+    ActualizarRepartidorRequest:
+      type: object
+      properties:
+        disponible:
+          type: boolean
+          example: true
+        licencia:
+          type: string
+          nullable: true
+          example: B-123456
+    CrearIncidenciaRequest:
+      type: object
+      properties:
+        envioId:
+          type: string
+          description: cuid del envío afectado
+          example: cklz3x9h00010a1b2c3d4e5f7
+        tipo:
+          $ref: '#/components/schemas/TipoIncidencia'
+        descripcion:
+          type: string
+          minLength: 1
+          example: El cliente no se encontraba en la dirección
+      required: [envioId, tipo, descripcion]
+    ActualizarEstadoIncidenciaRequest:
+      type: object
+      properties:
+        estado:
+          $ref: '#/components/schemas/EstadoIncidencia'
+      required: [estado]
+  responses:
+    Unauthorized:
+      description: No autenticado (token ausente, inválido o expirado).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            missingToken:
+              summary: Token de acceso requerido
+              value: { error: MISSING_TOKEN, message: Token de acceso requerido, statusCode: 401 }
+            invalidToken:
+              summary: Token inválido
+              value: { error: INVALID_TOKEN, message: Token inválido, statusCode: 401 }
+            expiredToken:
+              summary: Token expirado
+              value: { error: EXPIRED_TOKEN, message: Token expirado, statusCode: 401 }
+    Forbidden:
+      description: Acceso denegado por rol insuficiente.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: FORBIDDEN
+            message: "Acceso denegado: se requiere rol OPERADOR"
+            statusCode: 403
+    NotFound:
+      description: Recurso no encontrado.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: NOT_FOUND
+            message: Recurso no encontrado
+            statusCode: 404
+    ValidationError:
+      description: Error de validación de body/query/params (Zod).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            error: VALIDATION_ERROR
+            message: "peso: Number must be greater than 0"
+            statusCode: 422
+            details:
+              - code: too_small
+                minimum: 0
+                type: number
+                inclusive: false
+                path: [peso]
+                message: Number must be greater than 0
+    Conflict:
+      description: Conflicto de estado o de unicidad.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: CONFLICT
+            message: Conflicto de estado
+            statusCode: 409
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar un nuevo usuario (cliente, operador o repartidor) y crear su perfil asociado según el rol.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Usuario registrado correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RegisterResultDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 201
+        '409':
+          description: El correo ya está registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: EMAIL_ALREADY_EXISTS
+                message: El correo ya está registrado
+                statusCode: 409
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Autenticar usuario por correo y contraseña; devuelve access token y setea cookie de refresh token.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login exitoso.
+          headers:
+            Set-Cookie:
+              description: Cookie httpOnly `refreshToken` (7 días, `secure` en producción, `sameSite=strict`).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/LoginResultDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          description: Credenciales inválidas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_CREDENTIALS
+                message: Credenciales inválidas
+                statusCode: 401
+        '403':
+          description: La cuenta está desactivada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: USER_INACTIVE
+                message: "La cuenta está desactivada. Contacta al administrador."
+                statusCode: 403
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renovar el access token a partir del refresh token almacenado en cookie.
+      security: []
+      description: |
+        No recibe body; lee la cookie httpOnly `refreshToken`. Revoca el refresh
+        token usado y emite uno nuevo (rotación), devuelto en la misma cookie.
+      responses:
+        '200':
+          description: Token renovado correctamente.
+          headers:
+            Set-Cookie:
+              description: Nueva cookie httpOnly `refreshToken` (rotación).
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RefreshResultDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          description: Refresh token ausente, inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingRefreshToken:
+                  summary: Refresh token ausente
+                  value: { error: MISSING_REFRESH_TOKEN, message: Refresh token ausente, statusCode: 401 }
+                invalidRefreshToken:
+                  summary: Token inválido
+                  value: { error: INVALID_REFRESH_TOKEN, message: Token inválido, statusCode: 401 }
+                expiredRefreshToken:
+                  summary: Sesión expirada
+                  value: { error: EXPIRED_REFRESH_TOKEN, message: "Sesión expirada, inicia sesión de nuevo", statusCode: 401 }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Cerrar sesión revocando el refresh token y limpiando la cookie.
+      security: []
+      description: |
+        No recibe body; lee la cookie httpOnly `refreshToken` (opcional). Si
+        existe un refresh token válido y no revocado, lo marca como revocado.
+        Limpia la cookie `refreshToken`. No falla si la cookie está ausente o el
+        token ya estaba revocado.
+      responses:
+        '200':
+          description: Sesión cerrada correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Solicitar el envío de un correo de recuperación de contraseña.
+      security: []
+      description: |
+        Si el correo no existe, no hace nada (mismo mensaje, sin error). Si
+        existe, genera un token aleatorio (32 bytes hex), lo persiste con
+        expiración de 1 hora y envía un email con el enlace de recuperación.
+        En `NODE_ENV=test` el envío de correo se omite.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Solicitud procesada (no revela si el correo existe).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+                  message:
+                    type: string
+                    example: Si el correo existe recibirás un enlace de recuperación
+                  status:
+                    type: integer
+                    example: 200
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Restablecer la contraseña usando el token recibido por correo.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Contraseña actualizada correctamente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    example: null
+                  message:
+                    type: string
+                    example: Contraseña actualizada correctamente
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Token de recuperación inválido o expirado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_RESET_TOKEN
+                message: Token inválido o expirado
+                statusCode: 400
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/me:
+    get:
+      tags: [Perfil]
+      summary: Obtener el perfil del usuario autenticado.
+      description: Requiere cualquier rol autenticado (CLIENTE, OPERADOR o REPARTIDOR).
+      responses:
+        '200':
+          description: Perfil del usuario autenticado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PerfilDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Usuario no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: NOT_FOUND
+                message: Usuario no encontrado
+                statusCode: 404
+    patch:
+      tags: [Perfil]
+      summary: Actualizar nombre y/o teléfono del usuario autenticado.
+      description: |
+        Requiere cualquier rol autenticado (CLIENTE, OPERADOR o REPARTIDOR).
+        Debe proporcionarse al menos uno de `nombre` o `telefono`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMeRequest'
+      responses:
+        '200':
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PerfilDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /usuarios:
+    get:
+      tags: [Usuarios]
+      summary: Listar usuarios del sistema con paginación y filtro opcional por rol.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: rol
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/Rol'
+      responses:
+        '200':
+          description: Lista paginada de usuarios.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UsuarioDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /usuarios/{id}:
+    get:
+      tags: [Usuarios]
+      summary: Obtener el detalle de un usuario por su ID.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del usuario
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle del usuario.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UsuarioDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Usuario no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: NOT_FOUND
+                message: Usuario no encontrado
+                statusCode: 404
+
+  /usuarios/{id}/estado:
+    patch:
+      tags: [Usuarios]
+      summary: Activar o desactivar la cuenta de un usuario.
+      description: |
+        Requiere rol OPERADOR. Un operador no puede desactivar su propia cuenta.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del usuario
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarEstadoUsuarioRequest'
+      responses:
+        '200':
+          description: Estado del usuario actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/UsuarioDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Usuario no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: NOT_FOUND
+                message: Usuario no encontrado
+                statusCode: 404
+        '409':
+          description: No puedes desactivar tu propia cuenta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: CANNOT_DEACTIVATE_SELF
+                message: No puedes desactivar tu propia cuenta
+                statusCode: 409
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /envios:
+    post:
+      tags: [Envios]
+      summary: Registrar un nuevo envío para un cliente existente.
+      description: |
+        Requiere rol OPERADOR. Genera `codigoSeguimiento` único
+        (`TRK-YYYYMMDD-XXXXXXXX`). Envía notificación al usuario del cliente
+        con tipo `ENVIO_CREADO`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearEnvioRequest'
+      responses:
+        '201':
+          description: Envío creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EnvioResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 201
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Cliente no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: CLIENTE_NOT_FOUND
+                message: Cliente no encontrado
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          description: No se pudo generar un código de seguimiento único.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: CODIGO_GENERATION_FAILED
+                message: No se pudo generar un código de seguimiento único
+                statusCode: 500
+    get:
+      tags: [Envios]
+      summary: Listar envíos con paginación y filtros.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+        - name: estado
+          in: query
+          required: false
+          description: Filtrar por estado del envío.
+          schema:
+            $ref: '#/components/schemas/EstadoEnvio'
+        - name: cliente
+          in: query
+          required: false
+          description: Filtrar por nombre de cliente (contiene, insensible a mayúsculas).
+          schema:
+            type: string
+        - name: codigo
+          in: query
+          required: false
+          description: Filtrar por código de seguimiento (contiene, insensible a mayúsculas).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista paginada de envíos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EnvioListItemDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /envios/{id}:
+    get:
+      tags: [Envios]
+      summary: Obtener el detalle de un envío, incluyendo su historial de eventos.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del envío
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle del envío.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EnvioDetalleDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ENVIO_NOT_FOUND
+                message: Envío no encontrado
+                statusCode: 404
+    patch:
+      tags: [Envios]
+      summary: Editar datos de un envío existente.
+      description: |
+        Requiere rol OPERADOR. Debe enviarse al menos un campo editable
+        (validado con `.refine`).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del envío
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditarEnvioRequest'
+      responses:
+        '200':
+          description: Envío actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EnvioResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '400':
+          description: Se requiere al menos un campo editable.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: VALIDATION_ERROR
+                message: Se requiere al menos un campo editable
+                statusCode: 400
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ENVIO_NOT_FOUND
+                message: Envío no encontrado
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Envios]
+      summary: Cancelar un envío en estado PENDIENTE.
+      description: |
+        Requiere rol OPERADOR. Solo permite cancelar envíos en estado
+        `PENDIENTE`. Si el envío pertenecía a una ruta, se evalúa el cierre
+        automático de la ruta.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del envío
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Envío cancelado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/CancelarEnvioResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ENVIO_NOT_FOUND
+                message: Envío no encontrado
+                statusCode: 404
+        '409':
+          description: Solo se pueden cancelar envíos en estado PENDIENTE.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_STATE_TRANSITION
+                message: Solo se pueden cancelar envíos en estado PENDIENTE
+                statusCode: 409
+
+  /envios/{id}/reprogramar:
+    post:
+      tags: [Envios]
+      summary: Reprogramar la fecha de entrega de un envío (gestión de incidencias).
+      description: |
+        Requiere rol OPERADOR. Crea un evento de historial "Entrega
+        reprogramada para `<fechaIso>`".
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del envío
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReprogramarEnvioRequest'
+      responses:
+        '200':
+          description: Envío reprogramado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReprogramarEnvioResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ENVIO_NOT_FOUND
+                message: Envío no encontrado
+                statusCode: 404
+        '409':
+          description: No se puede reprogramar un envío en estado terminal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_STATE_TRANSITION
+                message: No se puede reprogramar un envío en estado terminal
+                statusCode: 409
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /envios/{id}/confirmar:
+    post:
+      tags: [Entregas]
+      summary: Confirmar la entrega de un envío asignado al repartidor autenticado, adjuntando evidencia fotográfica y firma.
+      description: |
+        Requiere rol REPARTIDOR. El envío debe pertenecer a una ruta del
+        repartidor autenticado y no estar en un estado terminal (`ENTREGADO`,
+        `CANCELADO`, `FALLIDO`). Guarda los archivos en
+        `uploads/entregas/<envioId>/` y expone rutas públicas
+        `/uploads/entregas/<envioId>/<archivo>`. Crea un `EventoEnvio` y
+        cambia el estado del envío a `ENTREGADO`. Envía notificación al
+        cliente con tipo `ENTREGA_REALIZADA` (incluye email).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del envío
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                foto:
+                  type: string
+                  format: binary
+                  description: Evidencia fotográfica de la entrega (image/jpeg o image/png, máx. 5 MB).
+                firma:
+                  type: string
+                  format: binary
+                  description: Firma del receptor (image/jpeg o image/png, máx. 5 MB).
+              required: [foto, firma]
+      responses:
+        '200':
+          description: Entrega confirmada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ConfirmarEntregaResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El envío no está asignado a una ruta del repartidor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: FORBIDDEN
+                message: El envío no está asignado a una ruta del repartidor
+                statusCode: 403
+        '404':
+          description: Repartidor o envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                repartidorNotFound:
+                  summary: Repartidor no encontrado
+                  value: { error: REPARTIDOR_NOT_FOUND, message: Repartidor no encontrado, statusCode: 404 }
+                envioNotFound:
+                  summary: Envío no encontrado
+                  value: { error: ENVIO_NOT_FOUND, message: Envío no encontrado, statusCode: 404 }
+        '409':
+          description: No se puede modificar un envío en estado terminal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_STATE_TRANSITION
+                message: "No se puede modificar un envío en estado <estado>"
+                statusCode: 409
+        '422':
+          description: Falta algún archivo requerido o el tipo de archivo no es soportado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missingFile:
+                  summary: Faltan foto y/o firma
+                  value: { error: MISSING_FILE, message: "Se requieren los archivos foto y firma", statusCode: 422 }
+                invalidFileType:
+                  summary: Tipo de archivo no soportado
+                  value: { error: INVALID_FILE_TYPE, message: "Tipo de archivo no soportado: solo se admiten image/jpeg e image/png", statusCode: 422 }
+                fileTooLarge:
+                  summary: Archivo demasiado grande
+                  value: { error: FILE_TOO_LARGE, message: "El archivo excede el tamaño máximo permitido (5MB)", statusCode: 422 }
+
+  /envios/{id}/fallo:
+    post:
+      tags: [Entregas]
+      summary: Registrar un fallo en la entrega de un envío asignado al repartidor autenticado.
+      description: |
+        Requiere rol REPARTIDOR. El envío debe pertenecer a una ruta del
+        repartidor autenticado y no estar en un estado terminal (`ENTREGADO`,
+        `CANCELADO`, `FALLIDO`). Si se adjunta `foto`, se guarda en
+        `uploads/entregas/<envioId>/`. Cambia el estado del envío a `FALLIDO`
+        y crea una `Incidencia` de tipo `ENTREGA_FALLIDA`. Envía dos
+        notificaciones al cliente: tipo `CAMBIO_ESTADO` y tipo
+        `INCIDENCIA_REPORTADA` (con email).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del envío
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                nota:
+                  type: string
+                  minLength: 1
+                  description: Motivo/observación del fallo de entrega.
+                foto:
+                  type: string
+                  format: binary
+                  description: Evidencia fotográfica opcional del fallo (image/jpeg o image/png, máx. 5 MB).
+              required: [nota]
+      responses:
+        '200':
+          description: Fallo de entrega registrado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RegistrarFalloResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: El envío no está asignado a una ruta del repartidor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: FORBIDDEN
+                message: El envío no está asignado a una ruta del repartidor
+                statusCode: 403
+        '404':
+          description: Repartidor o envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                repartidorNotFound:
+                  summary: Repartidor no encontrado
+                  value: { error: REPARTIDOR_NOT_FOUND, message: Repartidor no encontrado, statusCode: 404 }
+                envioNotFound:
+                  summary: Envío no encontrado
+                  value: { error: ENVIO_NOT_FOUND, message: Envío no encontrado, statusCode: 404 }
+        '409':
+          description: No se puede modificar un envío en estado terminal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INVALID_STATE_TRANSITION
+                message: "No se puede modificar un envío en estado <estado>"
+                statusCode: 409
+        '422':
+          description: Tipo de archivo no soportado o archivo demasiado grande.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalidFileType:
+                  summary: Tipo de archivo no soportado
+                  value: { error: INVALID_FILE_TYPE, message: "Tipo de archivo no soportado: solo se admiten image/jpeg e image/png", statusCode: 422 }
+                fileTooLarge:
+                  summary: Archivo demasiado grande
+                  value: { error: FILE_TOO_LARGE, message: "El archivo excede el tamaño máximo permitido (5MB)", statusCode: 422 }
+
+  /clientes:
+    get:
+      tags: [Clientes]
+      summary: Buscar clientes por nombre o correo (autocompletar para creación de envíos).
+      description: |
+        Requiere rol OPERADOR. Sin paginación, máximo 10 resultados.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Texto de búsqueda contra nombre o correo del usuario asociado (contiene, insensible a mayúsculas).
+          schema:
+            type: string
+            default: ""
+      responses:
+        '200':
+          description: Resultados de la búsqueda (máx. 10).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClienteSearchItemDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /clientes/me/envios:
+    get:
+      tags: [Clientes]
+      summary: Listar los envíos propios del cliente autenticado, con paginación y filtro por estado.
+      description: Requiere rol CLIENTE.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+        - name: estado
+          in: query
+          required: false
+          description: Filtrar por estado del envío.
+          schema:
+            $ref: '#/components/schemas/EstadoEnvio'
+      responses:
+        '200':
+          description: Lista paginada de envíos propios del cliente.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MisEnviosItemDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: No existe perfil de cliente para este usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: CLIENTE_NOT_FOUND
+                message: No existe perfil de cliente para este usuario
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /tracking/{codigo}:
+    get:
+      tags: [Tracking]
+      summary: Consultar el estado y el historial de eventos de un envío a partir de su código de seguimiento.
+      description: |
+        Endpoint público (sin autenticación), pensado para que cualquier
+        persona con el código de seguimiento pueda consultar el estado del
+        envío.
+      security: []
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          description: Código de seguimiento del envío.
+          schema:
+            type: string
+            pattern: '^TRK-\d{8}-[A-Z0-9]{8}$'
+            example: TRK-20260611-AB12CD34
+      responses:
+        '200':
+          description: Información de tracking del envío.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TrackingResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '404':
+          description: Envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ENVIO_NOT_FOUND
+                message: Envío no encontrado
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /rutas:
+    post:
+      tags: [Rutas]
+      summary: Crear una nueva ruta asignando envíos, vehículo y repartidor.
+      description: |
+        Requiere rol OPERADOR. Dentro de una transacción: los envíos pasan a
+        estado `EN_RUTA`, el vehículo pasa a `EN_RUTA` y el repartidor queda
+        con `disponible: false`. Envía notificación `RUTA_ASIGNADA` al
+        repartidor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearRutaRequest'
+      responses:
+        '201':
+          description: Ruta creada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RutaResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 201
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Algún envío, el vehículo o el repartidor no existen.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                envioNotFound:
+                  summary: Alguno de los envíos no existe
+                  value: { error: ENVIO_NOT_FOUND, message: "Envíos no encontrados", statusCode: 404 }
+                vehiculoNotFound:
+                  summary: Vehículo no encontrado
+                  value: { error: VEHICULO_NOT_FOUND, message: Vehículo no encontrado, statusCode: 404 }
+                repartidorNotFound:
+                  summary: Repartidor no encontrado
+                  value: { error: REPARTIDOR_NOT_FOUND, message: Repartidor no encontrado, statusCode: 404 }
+        '422':
+          description: Estado inválido del envío/vehículo/repartidor, o error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                envioInvalidState:
+                  summary: Envío no está en estado PENDIENTE
+                  value: { error: ENVIO_INVALID_STATE, message: "El envío no está en estado PENDIENTE", statusCode: 422 }
+                envioAlreadyAssigned:
+                  summary: Envío ya asignado a otra ruta
+                  value: { error: ENVIO_ALREADY_ASSIGNED, message: "El envío ya está asignado a otra ruta", statusCode: 422 }
+                vehiculoNotAvailable:
+                  summary: Vehículo no disponible
+                  value: { error: VEHICULO_NOT_AVAILABLE, message: "El vehículo no está disponible", statusCode: 422 }
+                repartidorNotAvailable:
+                  summary: Repartidor no disponible
+                  value: { error: REPARTIDOR_NOT_AVAILABLE, message: "El repartidor no está disponible", statusCode: 422 }
+        '500':
+          description: No se pudo generar un código de ruta único.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: CODIGO_GENERATION_FAILED
+                message: No se pudo generar un código de ruta único
+                statusCode: 500
+    get:
+      tags: [Rutas]
+      summary: Listar rutas con paginación.
+      description: |
+        Requiere rol OPERADOR o REPARTIDOR. Un usuario con rol REPARTIDOR ve
+        solo sus propias rutas.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+        - name: repartidorId
+          in: query
+          required: false
+          description: Filtrar por repartidor (uso típico de OPERADOR).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista paginada de rutas.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RutaResponseDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Repartidor no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: REPARTIDOR_NOT_FOUND
+                message: Repartidor no encontrado
+                statusCode: 404
+
+  /rutas/{id}:
+    get:
+      tags: [Rutas]
+      summary: Obtener el detalle de una ruta.
+      description: |
+        Requiere rol OPERADOR o REPARTIDOR. Un REPARTIDOR solo puede acceder a
+        sus propias rutas (`FORBIDDEN` si la ruta no le pertenece).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid de la ruta
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle de la ruta.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RutaResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: La ruta no pertenece al repartidor autenticado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: FORBIDDEN
+                message: No tienes acceso a esta ruta
+                statusCode: 403
+        '404':
+          description: Ruta no encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: RUTA_NOT_FOUND
+                message: Ruta no encontrada
+                statusCode: 404
+    patch:
+      tags: [Rutas]
+      summary: Reasignar repartidor y/o vehículo de una ruta.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid de la ruta
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasignarRutaRequest'
+      responses:
+        '200':
+          description: Ruta reasignada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RutaResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Ruta, repartidor o vehículo no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rutaNotFound:
+                  summary: Ruta no encontrada
+                  value: { error: RUTA_NOT_FOUND, message: Ruta no encontrada, statusCode: 404 }
+                repartidorNotFound:
+                  summary: Repartidor no encontrado
+                  value: { error: REPARTIDOR_NOT_FOUND, message: Repartidor no encontrado, statusCode: 404 }
+                vehiculoNotFound:
+                  summary: Vehículo no encontrado
+                  value: { error: VEHICULO_NOT_FOUND, message: Vehículo no encontrado, statusCode: 404 }
+        '422':
+          description: Estado inválido de la ruta, repartidor o vehículo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                rutaInvalidState:
+                  summary: Ruta completada o cancelada
+                  value: { error: RUTA_INVALID_STATE, message: "No se puede reasignar una ruta completada o cancelada", statusCode: 422 }
+                repartidorNotAvailable:
+                  summary: Repartidor no disponible
+                  value: { error: REPARTIDOR_NOT_AVAILABLE, message: "El repartidor no está disponible", statusCode: 422 }
+                vehiculoNotAvailable:
+                  summary: Vehículo no disponible
+                  value: { error: VEHICULO_NOT_AVAILABLE, message: "El vehículo no está disponible", statusCode: 422 }
+
+  /rutas/{id}/optima:
+    get:
+      tags: [Rutas]
+      summary: Calcular el orden óptimo de paradas de la ruta.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid de la ruta
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Orden óptimo de paradas calculado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RutaOptimaResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Ruta no encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: RUTA_NOT_FOUND
+                message: Ruta no encontrada
+                statusCode: 404
+
+  /vehiculos:
+    post:
+      tags: [Vehiculos]
+      summary: Registrar un nuevo vehículo.
+      description: Requiere rol OPERADOR.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearVehiculoRequest'
+      responses:
+        '201':
+          description: Vehículo registrado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VehiculoResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 201
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: La placa ya está registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: PLACA_DUPLICADA
+                message: La placa ya está registrada
+                statusCode: 409
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    get:
+      tags: [Vehiculos]
+      summary: Listar vehículos, con filtro opcional por estado.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          description: Filtrar por estado del vehículo.
+          schema:
+            $ref: '#/components/schemas/EstadoVehiculo'
+      responses:
+        '200':
+          description: Lista de vehículos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VehiculoResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /vehiculos/{id}:
+    patch:
+      tags: [Vehiculos]
+      summary: Actualizar el estado de un vehículo.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del vehículo
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarEstadoVehiculoRequest'
+      responses:
+        '200':
+          description: Estado del vehículo actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/VehiculoResponseDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Vehículo no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: VEHICULO_NOT_FOUND
+                message: Vehículo no encontrado
+                statusCode: 404
+        '422':
+          description: El vehículo está asignado a una ruta activa, o error de validación.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                vehiculoEnRutaActiva:
+                  summary: Vehículo en ruta activa
+                  value: { error: VEHICULO_EN_RUTA_ACTIVA, message: "El vehículo está asignado a una ruta activa", statusCode: 422 }
+
+  /repartidores:
+    get:
+      tags: [Repartidores]
+      summary: Listar repartidores con paginación y filtro opcional por disponibilidad.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+        - name: disponible
+          in: query
+          required: false
+          description: Filtrar por disponibilidad del repartidor.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Lista paginada de repartidores.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RepartidorDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /repartidores/{id}:
+    get:
+      tags: [Repartidores]
+      summary: Obtener el detalle de un repartidor.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del repartidor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detalle del repartidor.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RepartidorDetalleDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Repartidor no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: NOT_FOUND
+                message: Repartidor no encontrado
+                statusCode: 404
+    patch:
+      tags: [Repartidores]
+      summary: Actualizar disponibilidad y/o licencia de un repartidor.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: cuid del repartidor
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarRepartidorRequest'
+      responses:
+        '200':
+          description: Repartidor actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/RepartidorDetalleDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Repartidor no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: NOT_FOUND
+                message: Repartidor no encontrado
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /entregas:
+    get:
+      tags: [Entregas]
+      summary: Listar las entregas asignadas al repartidor autenticado, agrupadas en pendientes y completadas.
+      description: |
+        Requiere rol REPARTIDOR. Pendientes = envíos en estado `PENDIENTE`,
+        `EN_PREPARACION`, `EN_TRANSITO` o `EN_RUTA`; completadas = `ENTREGADO`
+        o `FALLIDO`. Los envíos en estado `CANCELADO` se excluyen de ambos
+        grupos.
+      parameters:
+        - name: repartidorId
+          in: query
+          required: true
+          description: Solo se admite el valor literal `me`.
+          schema:
+            type: string
+            enum: [me]
+      responses:
+        '200':
+          description: Entregas agrupadas del repartidor autenticado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EntregasAgrupadasDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Repartidor no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: REPARTIDOR_NOT_FOUND
+                message: Repartidor no encontrado
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /repartidor/entregas:
+    get:
+      tags: [Entregas]
+      summary: Listar las entregas asignadas al repartidor autenticado (equivalente self-service de GET /entregas).
+      description: |
+        Requiere rol REPARTIDOR. Endpoint equivalente a `GET /entregas` que no
+        requiere el query param `repartidorId=me`; invoca la misma función de
+        servicio (`entregaService.listarMisEntregas`).
+      responses:
+        '200':
+          description: Entregas agrupadas del repartidor autenticado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/EntregasAgrupadasDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Repartidor no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: REPARTIDOR_NOT_FOUND
+                message: Repartidor no encontrado
+                statusCode: 404
+
+  /incidencias:
+    post:
+      tags: [Incidencias]
+      summary: Registrar una incidencia sobre un envío.
+      description: |
+        Requiere rol REPARTIDOR. Crea una notificación al cliente dueño del
+        envío (tipo `INCIDENCIA_REPORTADA`), que dispara push por socket y,
+        según el tipo, correo electrónico.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearIncidenciaRequest'
+      responses:
+        '201':
+          description: Incidencia registrada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/IncidenciaDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 201
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Envío no encontrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: ENVIO_NOT_FOUND
+                message: Envío no encontrado
+                statusCode: 404
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    get:
+      tags: [Incidencias]
+      summary: Listar incidencias con paginación y filtros opcionales.
+      description: Requiere rol OPERADOR.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+        - name: tipo
+          in: query
+          required: false
+          description: Filtrar por tipo de incidencia.
+          schema:
+            $ref: '#/components/schemas/TipoIncidencia'
+        - name: estado
+          in: query
+          required: false
+          description: Filtrar por estado de la incidencia.
+          schema:
+            $ref: '#/components/schemas/EstadoIncidencia'
+      responses:
+        '200':
+          description: Lista paginada de incidencias.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/IncidenciaListItemDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /incidencias/{id}:
+    patch:
+      tags: [Incidencias]
+      summary: Actualizar el estado de una incidencia.
+      description: |
+        Requiere rol OPERADOR. Si `estado=RESUELTA` y la incidencia es de tipo
+        `ENTREGA_FALLIDA` y el envío asociado está en estado `FALLIDO`, se
+        ejecuta una reactivación: el envío vuelve a `EN_RUTA` (transacción que
+        registra un `EventoEnvio`) y se notifica al cliente (tipo
+        `CAMBIO_ESTADO`). No se permite reabrir una incidencia ya `RESUELTA`,
+        ni transicionar al mismo estado actual.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la incidencia
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarEstadoIncidenciaRequest'
+      responses:
+        '200':
+          description: Incidencia actualizada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/IncidenciaDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Incidencia no encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: INCIDENCIA_NOT_FOUND
+                message: Incidencia no encontrada
+                statusCode: 404
+        '409':
+          description: Transición de estado inválida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                sameState:
+                  summary: La incidencia ya está en ese estado
+                  value: { error: INVALID_STATE_TRANSITION, message: "La incidencia ya se encuentra en ese estado", statusCode: 409 }
+                reopenResolved:
+                  summary: No se puede reabrir una incidencia resuelta
+                  value: { error: INVALID_STATE_TRANSITION, message: "No se puede reabrir una incidencia resuelta", statusCode: 409 }
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /notificaciones:
+    get:
+      tags: [Notificaciones]
+      summary: Listar notificaciones del usuario autenticado, paginadas.
+      description: |
+        Requiere cualquier rol autenticado (sin `roleMiddleware`). Filtra
+        siempre por `usuarioId` del token (cada usuario ve solo sus propias
+        notificaciones).
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 20
+      responses:
+        '200':
+          description: Lista paginada de notificaciones.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NotificacionDto'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /notificaciones/{id}/leer:
+    patch:
+      tags: [Notificaciones]
+      summary: Marcar una notificación propia como leída.
+      description: |
+        Requiere cualquier rol autenticado (sin `roleMiddleware`). Si la
+        notificación pertenece a otro usuario, también devuelve
+        `NOTIFICACION_NOT_FOUND` (no revela existencia). Si ya estaba leída,
+        devuelve el DTO sin volver a actualizar.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la notificación
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notificación marcada como leída.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/NotificacionDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Notificación no encontrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: NOTIFICACION_NOT_FOUND
+                message: Notificación no encontrada
+                statusCode: 404
+
+  /dashboard/metrics:
+    get:
+      tags: [Dashboard]
+      summary: Obtener métricas agregadas generales del sistema.
+      description: Requiere rol OPERADOR.
+      responses:
+        '200':
+          description: Métricas agregadas del sistema.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/DashboardMetricsDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/envios-recientes:
+    get:
+      tags: [Dashboard]
+      summary: Obtener los envíos más recientes del sistema.
+      description: Requiere rol OPERADOR.
+      responses:
+        '200':
+          description: Lista de envíos recientes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EnvioRecienteDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/rutas-pendientes:
+    get:
+      tags: [Dashboard]
+      summary: Obtener rutas pendientes de iniciar/asignar.
+      description: Requiere rol OPERADOR.
+      responses:
+        '200':
+          description: Lista de rutas pendientes.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RutaPendienteDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard/vehiculos-disponibles:
+    get:
+      tags: [Dashboard]
+      summary: Obtener vehículos actualmente disponibles.
+      description: Requiere rol OPERADOR.
+      responses:
+        '200':
+          description: Lista de vehículos disponibles.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VehiculoDisponibleDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /reportes/envios/export:
+    get:
+      tags: [Reportes]
+      summary: Exportar el reporte de envíos en un rango de fechas como archivo CSV descargable.
+      description: |
+        Requiere rol OPERADOR. `desde` se interpreta como `T00:00:00.000Z` y
+        `hasta` como `T23:59:59.999Z` (rango inclusivo). Los campos se escapan
+        con comillas dobles si contienen comas, comillas o saltos de línea.
+        Esta ruta está registrada antes que las rutas tipo `/envios/:id` para
+        que Express no interprete `export` como un parámetro `:id`.
+      parameters:
+        - name: desde
+          in: query
+          required: true
+          description: Fecha de inicio del rango (`YYYY-MM-DD`). Debe ser <= `hasta`.
+          schema:
+            type: string
+            example: '2026-06-01'
+        - name: hasta
+          in: query
+          required: true
+          description: Fecha de fin del rango (`YYYY-MM-DD`).
+          schema:
+            type: string
+            example: '2026-06-11'
+      responses:
+        '200':
+          description: |
+            Archivo CSV con cabecera
+            `codigoSeguimiento,estado,remitente,destinatario,direccionDestino,createdAt`,
+            una línea por envío en el rango.
+          headers:
+            Content-Disposition:
+              description: 'attachment; filename="envios-<desde>-<hasta>.csv"'
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: '`desde` es posterior a `hasta`, o error de validación.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                error: VALIDATION_ERROR
+                message: "desde debe ser anterior o igual a hasta"
+                statusCode: 422
+                details: []
+
+  /reportes/envios:
+    get:
+      tags: [Reportes]
+      summary: Obtener reporte estadístico de envíos en un rango de fechas (totales por estado y por día).
+      description: |
+        Requiere rol OPERADOR. `porDia` agrupa por `createdAt` truncado a
+        `YYYY-MM-DD`, ordenado ascendentemente. `totalPeriodo` es la suma de
+        `porEstado[].total`.
+      parameters:
+        - name: desde
+          in: query
+          required: true
+          description: Fecha de inicio del rango (`YYYY-MM-DD`). Debe ser <= `hasta`.
+          schema:
+            type: string
+            example: '2026-06-01'
+        - name: hasta
+          in: query
+          required: true
+          description: Fecha de fin del rango (`YYYY-MM-DD`).
+          schema:
+            type: string
+            example: '2026-06-11'
+      responses:
+        '200':
+          description: Reporte estadístico de envíos.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ReporteEnviosDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: '`desde` es posterior a `hasta`, o error de validación.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+              example:
+                error: VALIDATION_ERROR
+                message: "desde debe ser anterior o igual a hasta"
+                statusCode: 422
+                details: []
+
+  /reportes/repartidores:
+    get:
+      tags: [Reportes]
+      summary: Obtener ranking de repartidores por entregas completadas y fallidas.
+      description: |
+        Requiere rol OPERADOR. Para cada repartidor se recorren sus rutas y
+        los envíos de cada ruta: `ENTREGADO` suma a `totalEntregados`;
+        `FALLIDO` o `CANCELADO` suma a `totalFallidos`. Resultado ordenado
+        descendentemente por `totalEntregados`.
+      responses:
+        '200':
+          description: Ranking de repartidores.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RepartidorRankingDto'
+                  message:
+                    type: string
+                  status:
+                    type: integer
+                    example: 200
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
