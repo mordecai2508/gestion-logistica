@@ -408,3 +408,38 @@ agentes en background, sin importar la ruta del archivo.
 **Backlog completado. Todas las features del sprint 5 finalizadas.**
 
 ---
+
+## Sesión 2026-06-11 — repartidor_rutas_mapa (id 19)
+
+**Feature:** Repartidor: pantallas de Rutas, Mapa y cierre de sesión
+**Estado final:** `done`
+**Commits:** `100dbba feat(repartidor_rutas_mapa)` + cierre
+
+### Resumen
+- Sprint 6 agregado a partir de hallazgos de QA del humano sobre la app desplegada
+  (3 features pending: id 19-21).
+- `/repartidor/rutas` y `/repartidor/mapa` reemplazan sus `PlaceholderPage` por
+  pantallas reales, reutilizando `GET /api/v1/rutas?repartidorId=me` (sin
+  cambios de backend).
+- "Ruta activa" (para el mapa) = primera ruta no terminal (`COMPLETADA`/`CANCELADA`)
+  de las rutas del repartidor.
+- `RepartidorMap` (nuevo): mapa Leaflet de solo lectura, multi-marcador,
+  modelado sobre `TrackingMap.tsx` pero sin actualización en tiempo real.
+- `Perfil.tsx` incorpora botón "Cerrar sesión" (mismo patrón try/finally que
+  `ProfileMenu.tsx`), visible para CLIENTE/OPERADOR/REPARTIDOR.
+- 24/24 requisitos (R1-R24) con test, 181/181 tests frontend. Reviewer aprobó
+  en 1 pass. Build global tiene un error TS2322 preexistente en
+  `MisEnvios.test.tsx` (ajeno a esta feature, ya documentado en sesiones previas).
+
+### Archivos clave
+- `frontend/src/features/repartidor/RepartidorMap.tsx` (nuevo)
+- `frontend/src/features/repartidor/RutasRepartidor.tsx` (nuevo)
+- `frontend/src/features/repartidor/MapaRepartidor.tsx` (nuevo)
+- `frontend/src/features/auth/Perfil.tsx` (modificado — botón "Cerrar sesión")
+- `frontend/src/router/index.tsx` (modificado — rutas /repartidor/rutas y /repartidor/mapa)
+
+- `./init.sh` ✅ (30/30).
+
+**Próxima feature:** `gestion_usuarios` (id: 20, sprint 6, sdd: true).
+
+---

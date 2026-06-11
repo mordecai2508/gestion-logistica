@@ -13,7 +13,8 @@
     "sprint_2": "Gestión de Envíos",
     "sprint_3": "Rastreo y Logística",
     "sprint_4": "Entregas, Incidencias y Notificaciones",
-    "sprint_5": "UX, Roles y Completitud"
+    "sprint_5": "UX, Roles y Completitud",
+    "sprint_6": "Correcciones y completitud (hallazgos QA)"
   },
   "features": [
     {
@@ -345,6 +346,62 @@
       ],
       "sdd": false,
       "status": "done"
+    },
+    {
+      "id": 19,
+      "sprint": 6,
+      "name": "repartidor_rutas_mapa",
+      "title": "Repartidor: pantallas de Rutas, Mapa y cierre de sesión",
+      "description": "El repartidor accede a pantallas reales en /repartidor/rutas (sus rutas asignadas, reutilizando GET /api/v1/rutas?repartidorId=me) y /repartidor/mapa (mapa Leaflet de solo visualización con las paradas/envíos con coordenadas de su ruta activa), reemplazando los PlaceholderPage actuales. Además, la pantalla 'Mi Perfil' (compartida por los 3 roles) incorpora un botón 'Cerrar sesión'.",
+      "stories": ["HU55", "HU56", "HU57"],
+      "acceptance": [
+        "Pantalla /repartidor/rutas reemplaza el PlaceholderPage y lista (vía GET /api/v1/rutas?repartidorId=me, sin cambios de backend) las rutas asignadas al repartidor con código, estado y envíos incluidos",
+        "Si el repartidor no tiene rutas asignadas se muestra el mensaje 'No tienes rutas asignadas'",
+        "Pantalla /repartidor/mapa reemplaza el PlaceholderPage y muestra un mapa Leaflet de solo lectura con un marcador por cada envío con lat/lng de la ruta activa (primera ruta no terminal) del repartidor",
+        "Si no hay ruta activa o ningún envío tiene coordenadas, /repartidor/mapa muestra el mensaje 'Sin ubicaciones disponibles para mostrar'",
+        "frontend/src/features/auth/Perfil.tsx incluye un botón 'Cerrar sesión' visible para CLIENTE, OPERADOR y REPARTIDOR que invoca authService.logout(), limpia el authStore (clearAuth) y redirige a /login, siguiendo el mismo patrón que ProfileMenu.tsx",
+        "Tests: renderizado de /repartidor/rutas con rutas asignadas y con lista vacía; renderizado de /repartidor/mapa con marcadores y con estado vacío; click en 'Cerrar sesión' desde Perfil invoca logout y navega a /login"
+      ],
+      "sdd": true,
+      "status": "done"
+    },
+    {
+      "id": 20,
+      "sprint": 6,
+      "name": "gestion_usuarios",
+      "title": "Gestión de usuarios (vista operador)",
+      "description": "El operador accede a la pantalla 'Usuarios' (actualmente PlaceholderPage en /usuarios), que lista todos los usuarios del sistema (CLIENTE, OPERADOR, REPARTIDOR) paginados y filtrables por rol, con vista de detalle y la posibilidad de activar/desactivar una cuenta. Se agrega el campo `activo` (Boolean, default true) al modelo Usuario; los usuarios inactivos no pueden iniciar sesión.",
+      "stories": ["HU58", "HU59", "HU60"],
+      "acceptance": [
+        "Migración Prisma agrega el campo `activo Boolean @default(true)` al modelo Usuario",
+        "GET /api/v1/usuarios devuelve lista paginada (?page&limit) con filtro opcional ?rol=CLIENTE|OPERADOR|REPARTIDOR, protegido con authMiddleware + roleMiddleware('OPERADOR')",
+        "GET /api/v1/usuarios/:id devuelve el detalle del usuario (nombre, correo, rol, teléfono, activo, createdAt)",
+        "PATCH /api/v1/usuarios/:id/estado actualiza el campo activo (true/false), protegido con authMiddleware + roleMiddleware('OPERADOR'); un operador no puede desactivar su propia cuenta (409)",
+        "POST /api/v1/auth/login devuelve 403 para usuarios con activo=false, sin permitir emisión de tokens",
+        "Pantalla 'Gestión de Usuarios' (/usuarios) reemplaza el PlaceholderPage: tabla con nombre/correo/rol/badge de estado (Activo/Inactivo), filtro por rol, paginación y acción Activar/Desactivar por fila",
+        "Tests: backend — listar paginado, filtrar por rol, detalle, activar/desactivar, bloqueo de auto-desactivación, login rechazado para usuario inactivo, 403 con rol incorrecto. Frontend — renderizado de tabla, filtro por rol, acción activar/desactivar"
+      ],
+      "sdd": true,
+      "status": "pending"
+    },
+    {
+      "id": 21,
+      "sprint": 6,
+      "name": "entregas_reactivar_fallida",
+      "title": "Reactivar entregas fallidas al resolver incidencia",
+      "description": "Cuando el operador marca como RESUELTA una incidencia de tipo ENTREGA_FALLIDA cuyo envío está en estado FALLIDO, el sistema revierte automáticamente el envío a estado EN_RUTA (registrando un EventoEnvio), permitiendo que el repartidor lo vea de nuevo en su pestaña 'Pendientes' y pueda confirmar la entrega o registrar un nuevo fallo.",
+      "stories": ["HU61", "HU62"],
+      "acceptance": [
+        "PATCH /api/v1/incidencias/:id con estado=RESUELTA: si incidencia.tipo === 'ENTREGA_FALLIDA' y el envío asociado está en estado FALLIDO, el envío se actualiza a EN_RUTA dentro de la misma transacción que actualiza la incidencia",
+        "La transición crea un EventoEnvio con estado=EN_RUTA y descripción 'Entrega reactivada tras resolución de incidencia'",
+        "Si la incidencia es de otro tipo, o el envío asociado no está en estado FALLIDO, actualizarEstado de la incidencia se comporta igual que antes (sin modificar el envío)",
+        "El envío reactivado deja de aparecer en 'Completadas' y aparece en 'Pendientes' de GET /api/v1/entregas?repartidorId=me con navegable=true",
+        "El repartidor puede volver a llamar POST /api/v1/envios/:id/confirmar o /fallo sobre el envío reactivado (ya no se rechaza con INVALID_STATE_TRANSITION)",
+        "Se notifica al cliente (notificacionService) que su envío fue reactivado para reintento de entrega",
+        "Tests: resolver incidencia ENTREGA_FALLIDA con envío FALLIDO reactiva el envío a EN_RUTA + crea EventoEnvio + notifica; resolver incidencia de otro tipo no modifica el envío; resolver incidencia con envío no-FALLIDO no modifica el envío; el envío reactivado aparece en 'Pendientes' y admite confirmar/fallo nuevamente"
+      ],
+      "sdd": true,
+      "status": "pending"
     }
   ]
 }
