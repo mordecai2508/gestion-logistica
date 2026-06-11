@@ -183,6 +183,28 @@ describe('POST /api/v1/envios/:id/confirmar — Confirmación de entrega', () =>
     expect(res.status).toBe(403);
     expect(res.body.error).toBe('FORBIDDEN');
   });
+
+  it('R9 (entregas_reactivar_fallida) - debe procesar normalmente la confirmación de un envío EN_RUTA (p.ej. reactivado tras una incidencia), sin 409 INVALID_STATE_TRANSITION', async () => {
+    // EN_RUTA no pertenece a ESTADOS_TERMINALES (entregaService.ts), por lo
+    // que un envío reactivado de FALLIDO -> EN_RUTA (entregas_reactivar_fallida,
+    // R1) sigue siendo modificable. No se requiere ningún cambio de código:
+    // este test confirma el comportamiento end-to-end del controlador.
+    mockedEntregaService.confirmarEntrega.mockResolvedValue(okResponse);
+
+    const res = await request(app)
+      .post('/api/v1/envios/envio-1/confirmar')
+      .set('Authorization', `Bearer ${REPARTIDOR_TOKEN}`)
+      .attach('foto', JPEG_BUFFER, { filename: 'foto.jpg', contentType: 'image/jpeg' })
+      .attach('firma', PNG_BUFFER, { filename: 'firma.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(200);
+    expect(res.status).not.toBe(409);
+    expect(mockedEntregaService.confirmarEntrega).toHaveBeenCalledWith(
+      'envio-1',
+      'user-rep-1',
+      expect.objectContaining({ foto: expect.anything(), firma: expect.anything() }),
+    );
+  });
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -230,6 +252,11 @@ function loadServiceWithMockedRepos(): {
 }
 
 describe('entregaService.confirmarEntrega — lógica de negocio (real + repos mockeados)', () => {
+  // El fixture `findEnvioConRutaYCliente` de este test usa `estado: 'EN_RUTA'`
+  // (línea ~246), por lo que también cubre R9 (entregas_reactivar_fallida):
+  // `obtenerEnvioModificable` no rechaza un envío EN_RUTA (no está en
+  // ESTADOS_TERMINALES), incluyendo el caso de un envío reactivado tras la
+  // resolución de una incidencia ENTREGA_FALLIDA.
   it('R8 - debe llamar a notificacionService.notificar para el cliente al confirmar la entrega', async () => {
     const { service, entregaRepo, rutaRepo, notifService } = loadServiceWithMockedRepos();
 

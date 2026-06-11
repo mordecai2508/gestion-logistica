@@ -99,6 +99,34 @@ describe('GET /api/v1/entregas?repartidorId=me — Listado de entregas', () => {
     expect(completadasEstados).toEqual(expect.arrayContaining(['ENTREGADO', 'FALLIDO']));
   });
 
+  it('R8 (entregas_reactivar_fallida) - un envío reactivado de FALLIDO a EN_RUTA aparece en "pendientes" y no en "completadas"', async () => {
+    // Cubre HU62/R8: tras la reactivación (incidenciaService.actualizarEstado
+    // -> incidenciaRepository.resolverConReactivacionEnvio), el envío queda
+    // con estado EN_RUTA. La clasificación pendientes/completadas la decide
+    // entregaService.listarMisEntregas únicamente por `estado` (sin cambios
+    // de código en esta feature), por lo que basta un envío fixture en
+    // estado EN_RUTA para confirmar que cae en "pendientes" y no en
+    // "completadas".
+    const agrupadas: EntregasAgrupadasDto = {
+      pendientes: [makeItem({ id: 'envio-reactivado', estado: 'EN_RUTA' })],
+      completadas: [],
+    };
+    mockedEntregaService.listarMisEntregas.mockResolvedValue(agrupadas);
+
+    const res = await request(app)
+      .get('/api/v1/entregas?repartidorId=me')
+      .set('Authorization', `Bearer ${REPARTIDOR_TOKEN}`);
+
+    expect(res.status).toBe(200);
+    const pendientesIds = res.body.data.pendientes.map((e: EntregaListItemDto) => e.id);
+    const completadasIds = res.body.data.completadas.map((e: EntregaListItemDto) => e.id);
+    expect(pendientesIds).toContain('envio-reactivado');
+    expect(completadasIds).not.toContain('envio-reactivado');
+    expect(
+      res.body.data.pendientes.find((e: EntregaListItemDto) => e.id === 'envio-reactivado').estado,
+    ).toBe('EN_RUTA');
+  });
+
   it('R3 - debe rechazar la petición sin token', async () => {
     const res = await request(app).get('/api/v1/entregas?repartidorId=me');
     expect(res.status).toBe(401);

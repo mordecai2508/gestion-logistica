@@ -114,6 +114,25 @@ export const incidenciaService = {
       );
     }
 
+    if (nuevoEstado === 'RESUELTA' && incidencia.tipo === 'ENTREGA_FALLIDA') {
+      const envio = await envioRepository.findById(incidencia.envioId);
+      const esReactivacion = envio !== null && envio.estado === 'FALLIDO';
+
+      if (esReactivacion) {
+        const { incidencia: incidenciaActualizada } =
+          await incidenciaRepository.resolverConReactivacionEnvio(id, incidencia.envioId);
+
+        await notificacionService.notificar({
+          usuarioId: envio.cliente.usuarioId,
+          envioId: incidencia.envioId,
+          mensaje: `Tu envío ${envio.codigoSeguimiento} fue reactivado para un nuevo intento de entrega`,
+          tipo: 'CAMBIO_ESTADO',
+        });
+
+        return proyectarIncidencia(incidenciaActualizada);
+      }
+    }
+
     const actualizada = await incidenciaRepository.actualizarEstado(id, nuevoEstado);
 
     return proyectarIncidencia(actualizada);

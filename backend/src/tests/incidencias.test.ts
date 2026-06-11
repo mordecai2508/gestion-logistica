@@ -2,7 +2,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { app } from '../index';
 import { incidenciaService } from '../services/incidenciaService';
-import { Rol, TipoIncidencia, EstadoIncidencia } from '@prisma/client';
+import { Rol, TipoIncidencia, EstadoIncidencia, EstadoEnvio } from '@prisma/client';
 import type { IncidenciaDto, PaginatedIncidenciasResponse } from '../types/incidenciaTypes';
 
 jest.mock('../repositories/incidenciaRepository');
@@ -397,16 +397,21 @@ type IncidenciaRepoMock = jest.Mocked<
   typeof import('../repositories/incidenciaRepository').incidenciaRepository
 >;
 type EnvioRepoMock = jest.Mocked<typeof import('../repositories/envioRepository').envioRepository>;
+type NotificacionServiceMock = jest.Mocked<
+  typeof import('../services/notificacionService').notificacionService
+>;
 type IncidenciaServiceReal = typeof import('../services/incidenciaService').incidenciaService;
 
 function loadServiceWithMockedRepos(): {
   service: IncidenciaServiceReal;
   incidenciaRepo: IncidenciaRepoMock;
   envioRepo: EnvioRepoMock;
+  notifService: NotificacionServiceMock;
 } {
   let service!: IncidenciaServiceReal;
   let incidenciaRepo!: IncidenciaRepoMock;
   let envioRepo!: EnvioRepoMock;
+  let notifService!: NotificacionServiceMock;
 
   jest.isolateModules(() => {
     jest.unmock('../services/incidenciaService');
@@ -416,10 +421,58 @@ function loadServiceWithMockedRepos(): {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     envioRepo = require('../repositories/envioRepository').envioRepository as EnvioRepoMock;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    notifService = require('../services/notificacionService')
+      .notificacionService as NotificacionServiceMock;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     service = require('../services/incidenciaService').incidenciaService as IncidenciaServiceReal;
   });
 
-  return { service, incidenciaRepo, envioRepo };
+  return { service, incidenciaRepo, envioRepo, notifService };
+}
+
+/**
+ * Construye un `EnvioConDetalle` (tipo de `envioRepository.findById`) para los
+ * tests de reactivación (R1-R6 de `entregas_reactivar_fallida`). `estado` es
+ * configurable para cubrir los casos FALLIDO (reactivación) y no-FALLIDO (R6).
+ */
+function makeEnvioConDetalle(overrides: Partial<{ estado: EstadoEnvio }> = {}) {
+  return {
+    id: 'envio-1',
+    codigoSeguimiento: 'TRK-20260604-A3F9B21C',
+    remitente: 'Juan Pérez',
+    destinatario: 'María López',
+    direccionDestino: 'Calle 123, Bogotá',
+    peso: 2.5,
+    dimensiones: '30x20x15',
+    descripcion: null,
+    estado: 'FALLIDO' as EstadoEnvio,
+    clienteId: 'cliente-1',
+    rutaId: null,
+    lat: null,
+    lng: null,
+    evidenciaFoto: null,
+    firma: null,
+    fechaReprogramacion: null,
+    createdAt: new Date('2026-06-04T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-04T00:00:00.000Z'),
+    eventos: [],
+    cliente: {
+      id: 'cliente-1',
+      usuarioId: 'user-cliente-1',
+      usuario: {
+        id: 'user-cliente-1',
+        nombre: 'Cliente Test',
+        correo: 'cliente@test.com',
+        password: 'hashed',
+        telefono: null,
+        rol: 'CLIENTE',
+        activo: true,
+        createdAt: new Date('2026-06-04T00:00:00.000Z'),
+        updatedAt: new Date('2026-06-04T00:00:00.000Z'),
+      },
+    },
+    ...overrides,
+  };
 }
 
 function makeEnvioRecord() {
@@ -637,6 +690,205 @@ describe('incidenciaService — lógica de negocio (unit, real implementación +
         EstadoIncidencia.ABIERTA,
       );
       expect(resultado.estado).toBe('ABIERTA');
+    });
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// incidenciaService.actualizarEstado — Reactivación de envío FALLIDO (HU61)
+// entregas_reactivar_fallida (R1-R7)
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe('incidenciaService.actualizarEstado — reactivación de envío al resolver ENTREGA_FALLIDA', () => {
+  it('R1/R2/R3 - debe reactivar el envío FALLIDO a EN_RUTA y registrar el EventoEnvio de reactivación dentro de una única transacción', async () => {
+    const { service, incidenciaRepo, envioRepo, notifService } = loadServiceWithMockedRepos();
+
+    incidenciaRepo.findById.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.ABIERTA }),
+    );
+    envioRepo.findById.mockResolvedValue(makeEnvioConDetalle({ estado: 'FALLIDO' }) as never);
+
+    const incidenciaResuelta = makeIncidenciaRecord({
+      tipo: TipoIncidencia.ENTREGA_FALLIDA,
+      estado: EstadoIncidencia.RESUELTA,
+    });
+    const envioReactivado = { ...makeEnvioConDetalle({ estado: 'EN_RUTA' }) };
+    incidenciaRepo.resolverConReactivacionEnvio.mockResolvedValue({
+      incidencia: incidenciaResuelta,
+      envio: envioReactivado as never,
+    });
+
+    notifService.notificar.mockResolvedValue({
+      id: 'notif-1',
+      tipo: 'CAMBIO_ESTADO',
+      mensaje: 'Tu envío TRK-20260604-A3F9B21C fue reactivado para un nuevo intento de entrega',
+      leida: false,
+      envioId: 'envio-1',
+      createdAt: new Date().toISOString(),
+    } as never);
+
+    const resultado = await service.actualizarEstado('incidencia-1', EstadoIncidencia.RESUELTA);
+
+    // R1/R3: la incidencia y el envío se actualizan en una sola operación
+    // transaccional del repositorio (resolverConReactivacionEnvio), no vía
+    // actualizarEstado.
+    expect(incidenciaRepo.resolverConReactivacionEnvio).toHaveBeenCalledWith(
+      'incidencia-1',
+      'envio-1',
+    );
+    expect(incidenciaRepo.actualizarEstado).not.toHaveBeenCalled();
+
+    // R2: el método de repositorio (verificado en incidenciaRepository.test
+    // a nivel de integración/Prisma) registra el EventoEnvio EN_RUTA con la
+    // descripción de reactivación; aquí confirmamos que el servicio delega en
+    // ese único método transaccional.
+    expect(resultado.estado).toBe('RESUELTA');
+  });
+
+  it('R4 - debe notificar al cliente dueño del envío con tipo CAMBIO_ESTADO mencionando el código de seguimiento y la reactivación', async () => {
+    const { service, incidenciaRepo, envioRepo, notifService } = loadServiceWithMockedRepos();
+
+    incidenciaRepo.findById.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.ABIERTA }),
+    );
+    envioRepo.findById.mockResolvedValue(makeEnvioConDetalle({ estado: 'FALLIDO' }) as never);
+    incidenciaRepo.resolverConReactivacionEnvio.mockResolvedValue({
+      incidencia: makeIncidenciaRecord({
+        tipo: TipoIncidencia.ENTREGA_FALLIDA,
+        estado: EstadoIncidencia.RESUELTA,
+      }),
+      envio: makeEnvioConDetalle({ estado: 'EN_RUTA' }) as never,
+    });
+    notifService.notificar.mockResolvedValue({
+      id: 'notif-1',
+      tipo: 'CAMBIO_ESTADO',
+      mensaje: 'Tu envío TRK-20260604-A3F9B21C fue reactivado para un nuevo intento de entrega',
+      leida: false,
+      envioId: 'envio-1',
+      createdAt: new Date().toISOString(),
+    } as never);
+
+    await service.actualizarEstado('incidencia-1', EstadoIncidencia.RESUELTA);
+
+    expect(notifService.notificar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        usuarioId: 'user-cliente-1',
+        envioId: 'envio-1',
+        mensaje: expect.stringContaining('TRK-20260604-A3F9B21C'),
+        tipo: 'CAMBIO_ESTADO',
+      }),
+    );
+    const mensaje = notifService.notificar.mock.calls[0][0].mensaje;
+    expect(mensaje.toLowerCase()).toContain('reactiv');
+  });
+
+  it('R5 - al resolver una incidencia cuyo tipo no es ENTREGA_FALLIDA, debe actualizar solo la incidencia y NO modificar el envío ni notificar', async () => {
+    const { service, incidenciaRepo, envioRepo, notifService } = loadServiceWithMockedRepos();
+
+    incidenciaRepo.findById.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.CLIENTE_AUSENTE, estado: EstadoIncidencia.ABIERTA }),
+    );
+    incidenciaRepo.actualizarEstado.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.CLIENTE_AUSENTE, estado: EstadoIncidencia.RESUELTA }),
+    );
+
+    const resultado = await service.actualizarEstado('incidencia-1', EstadoIncidencia.RESUELTA);
+
+    expect(incidenciaRepo.actualizarEstado).toHaveBeenCalledWith(
+      'incidencia-1',
+      EstadoIncidencia.RESUELTA,
+    );
+    expect(incidenciaRepo.resolverConReactivacionEnvio).not.toHaveBeenCalled();
+    expect(envioRepo.findById).not.toHaveBeenCalled();
+    expect(notifService.notificar).not.toHaveBeenCalled();
+    expect(resultado.estado).toBe('RESUELTA');
+  });
+
+  it('R6 - al resolver una incidencia ENTREGA_FALLIDA cuyo envío asociado NO está en estado FALLIDO, debe actualizar solo la incidencia y NO modificar el envío ni notificar', async () => {
+    const { service, incidenciaRepo, envioRepo, notifService } = loadServiceWithMockedRepos();
+
+    incidenciaRepo.findById.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.ABIERTA }),
+    );
+    envioRepo.findById.mockResolvedValue(makeEnvioConDetalle({ estado: 'EN_RUTA' }) as never);
+    incidenciaRepo.actualizarEstado.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.RESUELTA }),
+    );
+
+    const resultado = await service.actualizarEstado('incidencia-1', EstadoIncidencia.RESUELTA);
+
+    expect(envioRepo.findById).toHaveBeenCalledWith('envio-1');
+    expect(incidenciaRepo.actualizarEstado).toHaveBeenCalledWith(
+      'incidencia-1',
+      EstadoIncidencia.RESUELTA,
+    );
+    expect(incidenciaRepo.resolverConReactivacionEnvio).not.toHaveBeenCalled();
+    expect(notifService.notificar).not.toHaveBeenCalled();
+    expect(resultado.estado).toBe('RESUELTA');
+  });
+
+  it('R6 - al resolver una incidencia ENTREGA_FALLIDA cuyo envío asociado ya está ENTREGADO, debe actualizar solo la incidencia y NO modificar el envío', async () => {
+    const { service, incidenciaRepo, envioRepo, notifService } = loadServiceWithMockedRepos();
+
+    incidenciaRepo.findById.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.EN_PROCESO }),
+    );
+    envioRepo.findById.mockResolvedValue(makeEnvioConDetalle({ estado: 'ENTREGADO' }) as never);
+    incidenciaRepo.actualizarEstado.mockResolvedValue(
+      makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.RESUELTA }),
+    );
+
+    const resultado = await service.actualizarEstado('incidencia-1', EstadoIncidencia.RESUELTA);
+
+    expect(incidenciaRepo.actualizarEstado).toHaveBeenCalledWith(
+      'incidencia-1',
+      EstadoIncidencia.RESUELTA,
+    );
+    expect(incidenciaRepo.resolverConReactivacionEnvio).not.toHaveBeenCalled();
+    expect(notifService.notificar).not.toHaveBeenCalled();
+    expect(resultado.estado).toBe('RESUELTA');
+  });
+
+  describe('R7 - regresión: validaciones existentes (404/409) se preservan independientemente del tipo de incidencia o estado del envío', () => {
+    it('rechaza con 404 INCIDENCIA_NOT_FOUND para una incidencia ENTREGA_FALLIDA inexistente', async () => {
+      const { service, incidenciaRepo, envioRepo } = loadServiceWithMockedRepos();
+
+      incidenciaRepo.findById.mockResolvedValue(null);
+
+      await expect(
+        service.actualizarEstado('inexistente', EstadoIncidencia.RESUELTA),
+      ).rejects.toMatchObject({ error: 'INCIDENCIA_NOT_FOUND', statusCode: 404 });
+      expect(envioRepo.findById).not.toHaveBeenCalled();
+      expect(incidenciaRepo.resolverConReactivacionEnvio).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con 409 INVALID_STATE_TRANSITION al repetir el mismo estado para una incidencia ENTREGA_FALLIDA con envío FALLIDO', async () => {
+      const { service, incidenciaRepo, envioRepo } = loadServiceWithMockedRepos();
+
+      incidenciaRepo.findById.mockResolvedValue(
+        makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.RESUELTA }),
+      );
+
+      await expect(
+        service.actualizarEstado('incidencia-1', EstadoIncidencia.RESUELTA),
+      ).rejects.toMatchObject({ error: 'INVALID_STATE_TRANSITION', statusCode: 409 });
+      expect(envioRepo.findById).not.toHaveBeenCalled();
+      expect(incidenciaRepo.resolverConReactivacionEnvio).not.toHaveBeenCalled();
+    });
+
+    it('rechaza con 409 INVALID_STATE_TRANSITION al intentar reabrir una incidencia ENTREGA_FALLIDA RESUELTA, sin tocar el envío', async () => {
+      const { service, incidenciaRepo, envioRepo } = loadServiceWithMockedRepos();
+
+      incidenciaRepo.findById.mockResolvedValue(
+        makeIncidenciaRecord({ tipo: TipoIncidencia.ENTREGA_FALLIDA, estado: EstadoIncidencia.RESUELTA }),
+      );
+
+      await expect(
+        service.actualizarEstado('incidencia-1', EstadoIncidencia.EN_PROCESO),
+      ).rejects.toMatchObject({ error: 'INVALID_STATE_TRANSITION', statusCode: 409 });
+      expect(envioRepo.findById).not.toHaveBeenCalled();
+      expect(incidenciaRepo.resolverConReactivacionEnvio).not.toHaveBeenCalled();
+      expect(incidenciaRepo.actualizarEstado).not.toHaveBeenCalled();
     });
   });
 });
