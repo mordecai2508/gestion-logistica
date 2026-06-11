@@ -42,6 +42,14 @@ export const authService = {
       throw createAuthError('INVALID_CREDENTIALS', 'Credenciales inválidas', 401);
     }
 
+    if (!usuario.activo) {
+      throw createAuthError(
+        'USER_INACTIVE',
+        'La cuenta está desactivada. Contacta al administrador.',
+        403,
+      );
+    }
+
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       throw new Error('JWT_SECRET no configurado');

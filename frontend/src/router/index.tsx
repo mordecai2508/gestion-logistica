@@ -25,6 +25,7 @@ import { DashboardOperador } from '@/features/dashboard/DashboardOperador';
 import { MisEnvios } from '@/features/cliente/MisEnvios';
 import { GestionRepartidores } from '@/features/repartidores/GestionRepartidores';
 import { ReportesPage } from '@/features/reportes/ReportesPage';
+import { GestionUsuarios } from '@/features/usuarios/GestionUsuarios';
 
 export function AppRouter() {
   return (
@@ -60,7 +61,7 @@ export function AppRouter() {
             <Route path="/incidencias" element={<GestionIncidencias />} />
             <Route path="/reportes" element={<ReportesPage />} />
             <Route path="/repartidores" element={<GestionRepartidores />} />
-            <Route path="/usuarios" element={<PlaceholderPage title="Usuarios" />} />
+            <Route path="/usuarios" element={<GestionUsuarios />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/notificaciones" element={<Notificaciones />} />
           </Route>

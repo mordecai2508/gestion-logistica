@@ -69,6 +69,7 @@ function makeUser(overrides: Partial<{
   correo: string;
   password: string;
   rol: Rol;
+  activo: boolean;
 }> = {}) {
   return {
     id: 'user-1',
@@ -77,6 +78,7 @@ function makeUser(overrides: Partial<{
     password: '', // filled in beforeAll
     telefono: null,
     rol: Rol.OPERADOR,
+    activo: true,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

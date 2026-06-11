@@ -300,7 +300,7 @@ function makeEnvioConCliente(overrides: Partial<ReturnType<typeof makeEnvioRecor
     cliente: {
       id: base.clienteId,
       usuarioId: 'user-cliente-1',
-      usuario: { id: 'user-cliente-1', nombre: 'Ana García', correo: 'ana@example.com', password: 'hashed', telefono: null, rol: Rol.CLIENTE, createdAt: new Date(), updatedAt: new Date() },
+      usuario: { id: 'user-cliente-1', nombre: 'Ana García', correo: 'ana@example.com', password: 'hashed', telefono: null, rol: Rol.CLIENTE, activo: true, createdAt: new Date(), updatedAt: new Date() },
     },
   };
 }

@@ -248,6 +248,7 @@ function makeEnvioConRutaYCliente(): EnvioConRutaYCliente {
         password: 'hashed',
         telefono: null,
         rol: 'CLIENTE',
+        activo: true,
         createdAt: new Date(),
         updatedAt: new Date(),
       },

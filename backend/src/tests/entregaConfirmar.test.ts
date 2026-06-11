@@ -279,6 +279,7 @@ describe('entregaService.confirmarEntrega — lógica de negocio (real + repos m
           password: 'hashed',
           telefono: null,
           rol: 'CLIENTE',
+          activo: true,
           createdAt: new Date(),
           updatedAt: new Date(),
         },

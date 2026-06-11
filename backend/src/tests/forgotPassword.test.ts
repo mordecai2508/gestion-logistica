@@ -28,6 +28,7 @@ function makeUsuario(overrides: Partial<{
     password: 'hashed',
     telefono: null,
     rol: Rol.OPERADOR,
+    activo: true,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,

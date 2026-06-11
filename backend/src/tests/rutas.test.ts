@@ -54,7 +54,7 @@ function makeRepartidor(overrides: Partial<{
     id: 'repartidor-1', usuarioId: 'user-rep-1', licencia: 'LIC-001', disponible: true,
     usuario: {
       id: 'user-rep-1', nombre: 'Carlos Repartidor', correo: 'repartidor@test.com',
-      password: 'hashed', telefono: null, rol: 'REPARTIDOR' as const,
+      password: 'hashed', telefono: null, rol: 'REPARTIDOR' as const, activo: true,
       createdAt: new Date(), updatedAt: new Date(),
     },
     ...overrides,
