@@ -27,14 +27,16 @@ Ninguna.
 
 ## Última acción
 
-`repartidor_rutas_mapa` (id 19) cerrada con commit `100dbba feat(repartidor_rutas_mapa)`.
-Reviewer aprobó en 1 pass (24/24 requisitos con test, 181/181 tests, lint y
-`./init.sh` 30/30 en verde). Estado cambiado a `done` en `feature_list.json`.
+`gestion_usuarios` (id 20) cerrada con commit `dc5543c feat(gestion_usuarios)`.
+Reviewer aprobó en 1 pass (31/31 requisitos con test, 328/328 tests backend +
+194/194 tests frontend, lint y `./init.sh` 30/30 en verde). Estado cambiado a
+`done` en `feature_list.json`.
 
 ## Próximo paso
 
-Lanzar `spec_author` para `gestion_usuarios` (id 20, sprint 6, `pending`,
-`sdd: true`), siguiendo el flujo SDD de `.claude/agents/leader.md`.
+Lanzar `spec_author` para `entregas_reactivar_fallida` (id 21, sprint 6,
+`pending`, `sdd: true`), siguiendo el flujo SDD de `.claude/agents/leader.md`.
+Es la última feature pendiente del backlog.
 
 ## Bloqueos
 

@@ -443,3 +443,41 @@ agentes en background, sin importar la ruta del archivo.
 **Próxima feature:** `gestion_usuarios` (id: 20, sprint 6, sdd: true).
 
 ---
+
+## Sesión 2026-06-11 — gestion_usuarios (id 20)
+
+**Feature:** Gestión de usuarios (vista operador)
+**Estado final:** `done`
+**Commits:** `dc5543c feat(gestion_usuarios)` + cierre
+
+### Resumen
+- 3 endpoints nuevos OPERADOR bajo `/api/v1/usuarios`: GET `/` (listado paginado
+  + filtro `?rol`), GET `/:id` (detalle), PATCH `/:id/estado` (activar/desactivar).
+- Migración Prisma `add_usuario_activo`: campo `Usuario.activo` (Boolean,
+  default `true`).
+- `PATCH /usuarios/:id/estado` bloquea auto-desactivación con
+  409 `CANNOT_DEACTIVATE_SELF` (comparando `req.user.id` vs `:id` en el service).
+- `authService.login` ahora rechaza usuarios con `activo=false` (403
+  `USER_INACTIVE`), verificado DESPUÉS de `bcrypt.compare` para evitar
+  enumeración de cuentas.
+- Repositorio usa `select` explícito que excluye `password`/tokens en todas
+  las consultas de `/usuarios`.
+- `/usuarios` reemplaza su `PlaceholderPage` por `GestionUsuarios` (tabla +
+  filtro por rol + paginación + acción Activar/Desactivar + panel de detalle).
+- 31/31 requisitos (R1-R31) con test, 328/328 tests backend + 194/194 tests
+  frontend. Reviewer aprobó en 1 pass. Build frontend tiene el mismo TS2322
+  preexistente en `MisEnvios.test.tsx` (ajeno, ya documentado).
+
+### Archivos clave
+- `backend/src/services/usuarioService.ts` (nuevo — incluye `CANNOT_DEACTIVATE_SELF`)
+- `backend/src/repositories/usuarioRepository.ts` (nuevo — `select` sin `password`)
+- `backend/src/services/authService.ts` (modificado — chequeo `activo` en login)
+- `backend/prisma/migrations/20260611162952_add_usuario_activo/` (nueva)
+- `frontend/src/features/usuarios/{GestionUsuarios,UsuarioTable,UsuarioDetalle}.tsx` (nuevos)
+
+- `./init.sh` ✅ (30/30).
+
+**Próxima feature:** `entregas_reactivar_fallida` (id: 21, sprint 6, sdd: true) —
+última feature pendiente del backlog.
+
+---

@@ -382,7 +382,7 @@
         "Tests: backend — listar paginado, filtrar por rol, detalle, activar/desactivar, bloqueo de auto-desactivación, login rechazado para usuario inactivo, 403 con rol incorrecto. Frontend — renderizado de tabla, filtro por rol, acción activar/desactivar"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "done"
     },
     {
       "id": 21,
