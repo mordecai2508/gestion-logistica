@@ -481,3 +481,42 @@ agentes en background, sin importar la ruta del archivo.
 última feature pendiente del backlog.
 
 ---
+
+## Sesión 2026-06-11 — entregas_reactivar_fallida (id 21)
+
+**Feature:** Reactivar entregas fallidas al resolver incidencia
+**Estado final:** `done`
+**Commits:** `7adeb49 feat(entregas_reactivar_fallida)` + cierre
+
+### Resumen
+- 100% backend, sin migraciones ni cambios de frontend ni de contrato de API.
+- `incidenciaRepository.resolverConReactivacionEnvio(incidenciaId, envioId)`
+  (nuevo): una única `prisma.$transaction` que actualiza
+  `Incidencia.estado=RESUELTA`, `Envio.estado=EN_RUTA` y crea un `EventoEnvio`
+  (`estado: 'EN_RUTA'`, descripción "Entrega reactivada tras resolución de
+  incidencia"), siguiendo el patrón de `entregaRepository.confirmarEntrega`/
+  `registrarFallo`.
+- `incidenciaService.actualizarEstado` extendido: tras las validaciones
+  existentes (404/409/409 sin cambios), si `nuevoEstado === 'RESUELTA'` y
+  `incidencia.tipo === 'ENTREGA_FALLIDA'` y el envío asociado está `FALLIDO`,
+  delega en `resolverConReactivacionEnvio` y notifica al cliente
+  (`tipo: 'CAMBIO_ESTADO'`, mensaje con el código de seguimiento). En cualquier
+  otro caso, comportamiento idéntico al previo.
+- R8/R9 (envío reactivado visible en "Pendientes" y admite confirmar/fallo de
+  nuevo) se cumplen sin cambios de código en `entregaService` — solo tests de
+  regresión (`EN_RUTA` ya está en `ESTADOS_PENDIENTES` y fuera de
+  `ESTADOS_TERMINALES`).
+- 9/9 requisitos (R1-R9) con test, 339/339 tests backend (22/22 suites).
+  Reviewer aprobó en 1 pass. Sin cambios de frontend; mismo TS2322 preexistente
+  en `MisEnvios.test.tsx` (ajeno, ya documentado en sesiones previas).
+
+### Archivos clave
+- `backend/src/repositories/incidenciaRepository.ts` (modificado — nuevo método `resolverConReactivacionEnvio`)
+- `backend/src/services/incidenciaService.ts` (modificado — bifurcación `esReactivacion` en `actualizarEstado`)
+- `backend/src/tests/{incidencias,entregasListar,entregaConfirmar,entregaFallo}.test.ts` (modificados)
+
+- `./init.sh` ✅.
+
+**Próxima feature:** Ninguna — backlog completo (sprints 1-6, ids 1-21, todas `done`).
+
+---

@@ -401,7 +401,7 @@
         "Tests: resolver incidencia ENTREGA_FALLIDA con envío FALLIDO reactiva el envío a EN_RUTA + crea EventoEnvio + notifica; resolver incidencia de otro tipo no modifica el envío; resolver incidencia con envío no-FALLIDO no modifica el envío; el envío reactivado aparece en 'Pendientes' y admite confirmar/fallo nuevamente"
       ],
       "sdd": true,
-      "status": "pending"
+      "status": "done"
     }
   ]
 }

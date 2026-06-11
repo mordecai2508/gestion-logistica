@@ -8,18 +8,7 @@
 
 ## Estado
 
-Sprints 1-5 completados. Se agregó el Sprint 6 (`feature_list.json`) con 3
-features `pending`/`sdd: true` a partir de hallazgos de QA del humano sobre
-la app desplegada:
 
-- `repartidor_rutas_mapa` (id 19): pantallas reales /repartidor/rutas y
-  /repartidor/mapa (hoy PlaceholderPage) + botón "Cerrar sesión" en Perfil.tsx
-  (actualmente ningún rol sin topbar puede cerrar sesión desde ahí).
-- `gestion_usuarios` (id 20): pantalla /usuarios (hoy PlaceholderPage) +
-  endpoints CRUD-lite de usuarios + campo `activo` en Usuario (migración nueva).
-- `entregas_reactivar_fallida` (id 21): al resolver una incidencia
-  ENTREGA_FALLIDA, el envío FALLIDO debe volver a EN_RUTA para que el
-  repartidor pueda reintentar la entrega (hoy queda bloqueado para siempre).
 
 ## Feature en progreso
 
@@ -27,16 +16,11 @@ Ninguna.
 
 ## Última acción
 
-`gestion_usuarios` (id 20) cerrada con commit `dc5543c feat(gestion_usuarios)`.
-Reviewer aprobó en 1 pass (31/31 requisitos con test, 328/328 tests backend +
-194/194 tests frontend, lint y `./init.sh` 30/30 en verde). Estado cambiado a
-`done` en `feature_list.json`.
+
 
 ## Próximo paso
 
-Lanzar `spec_author` para `entregas_reactivar_fallida` (id 21, sprint 6,
-`pending`, `sdd: true`), siguiendo el flujo SDD de `.claude/agents/leader.md`.
-Es la última feature pendiente del backlog.
+
 
 ## Bloqueos
 
