@@ -15,6 +15,8 @@ import { GestionVehiculos } from '@/features/vehiculos/GestionVehiculos';
 import { GestionIncidencias } from '@/features/incidencias/GestionIncidencias';
 import { VistaRepartidor } from '@/features/repartidor/VistaRepartidor';
 import { ConfirmacionEntrega } from '@/features/repartidor/ConfirmacionEntrega';
+import { RutasRepartidor } from '@/features/repartidor/RutasRepartidor';
+import { MapaRepartidor } from '@/features/repartidor/MapaRepartidor';
 import { Notificaciones } from '@/features/notificaciones/Notificaciones';
 import { OperadorLayout } from '@/components/shared/OperadorLayout';
 import { RepartidorLayout } from '@/components/shared/RepartidorLayout';
@@ -72,8 +74,8 @@ export function AppRouter() {
               path="/repartidor/entregas/:id/confirmar"
               element={<ConfirmacionEntrega />}
             />
-            <Route path="/repartidor/rutas" element={<PlaceholderPage title="Rutas" />} />
-            <Route path="/repartidor/mapa" element={<PlaceholderPage title="Mapa" />} />
+            <Route path="/repartidor/rutas" element={<RutasRepartidor />} />
+            <Route path="/repartidor/mapa" element={<MapaRepartidor />} />
             <Route path="/repartidor/*" element={<PlaceholderPage title="Repartidor" />} />
             <Route path="/perfil" element={<Perfil />} />
             <Route path="/notificaciones" element={<Notificaciones />} />

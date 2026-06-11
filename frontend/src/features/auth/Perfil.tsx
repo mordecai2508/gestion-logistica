@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useNavigate } from 'react-router-dom';
 import { usePerfil } from '@/hooks/usePerfil';
 import { useUpdatePerfil } from '@/hooks/useUpdatePerfil';
+import { authService } from '@/services/authService';
+import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +27,8 @@ type UpdatePerfilFormData = z.infer<typeof updatePerfilSchema>;
 export function Perfil() {
   const { data: perfil, isPending: isLoadingPerfil } = usePerfil();
   const updatePerfilMutation = useUpdatePerfil();
+  const navigate = useNavigate();
+  const clearAuth = useAuthStore((s) => s.clearAuth);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -52,6 +57,17 @@ export function Perfil() {
         axiosErr?.message ??
         'Error al actualizar el perfil. Intente de nuevo.';
       setErrorMessage(msg);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // logout failure should not prevent local auth cleanup
+    } finally {
+      clearAuth();
+      navigate('/login');
     }
   };
 
@@ -139,6 +155,19 @@ export function Perfil() {
               {updatePerfilMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
             </Button>
           </form>
+
+          <div className="mt-4 border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                void handleLogout();
+              }}
+            >
+              Cerrar sesión
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
